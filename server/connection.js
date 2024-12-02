@@ -40,18 +40,24 @@ async function initExistingSessions() {
 }
 async function initializeSocket(sessionId) {
   const sessionsFolder = path.join(__dirname, `../sessions/${sessionId}`);
-  console.log(sessionsFolder);
   try {
     const { state, saveCreds } = await useMultiFileAuthState(sessionsFolder);
     const socket = await makeWASocket({
       auth: state,
       logger: pino({ level: "silent" }),
     });
-    await socket.ev.on("creds.update", saveCreds);
+    await socket.ev.on("creds.update", async (creds) => {
+      try {
+        await saveSession(sessionId, creds);
+        await saveCreds();
+      } catch (err) {
+        console.log("creds.update Error: ", err);
+      }
+    });
     return socket;
   } catch (err) {
-    return err;
     console.log("Error Start Session");
+    return err;
   }
 }
 // Fungsi untuk menghubungkan sesi WhatsApp
@@ -114,8 +120,9 @@ async function startSession(sessionId) {
             if (shouldReconnect) {
               await startSession(sessionId); // Coba untuk reconnect jika tidak logout
             } else {
-              if (fs.existsSync(sessionsFolder)) {
-                await deleteCreds(sessionsFolder);
+              const sessionPath = path.join(sessionsFolder, sessionId);
+              if (fs.existsSync(sessionPath)) {
+                await deleteCreds(sessionPath);
                 await Session.findOneAndDelete({ sessionId: sessionId });
               }
               reject(shouldReconnect);
@@ -125,17 +132,6 @@ async function startSession(sessionId) {
           }
         }
       });
-
-      // Event ketika ada perubahan autentikasi
-      await socket.ev.on("creds.update", async (creds) => {
-        try {
-          await saveSession(sessionId, creds);
-          await saveCreds();
-        } catch (err) {
-          console.log("creds.update Error: ", err);
-        }
-      });
-      await socket.logout();
     });
   } catch (err) {
     console.log("Error Start Session");
@@ -191,4 +187,5 @@ module.exports = {
   startSession,
   endSession,
   initializeSocket,
+  sessionsFolder,
 };

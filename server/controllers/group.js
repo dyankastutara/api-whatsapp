@@ -9,7 +9,9 @@ module.exports = {
         message: "",
       };
       try {
-        const socket = await initializeSocket(req.params.sessionId);
+        const sessionId = req.body.sessionId;
+        console.log(sessionId);
+        const socket = await initializeSocket(sessionId);
         await new Promise(async (resolve, reject) => {
           await socket.ev.on("connection.update", async (update) => {
             const { connection, lastDisconnect } = update;
@@ -18,9 +20,8 @@ module.exports = {
               error.status = lastDisconnect?.error?.statusCode;
               reject(error);
             } else if (connection === "open") {
-              console.log("Koneksi berhasil!");
               const groups = await socket.groupFetchAllParticipating();
-              finalResult.data = groups;
+              finalResult.data = Object.values(groups);
               finalResult.success = true;
               finalResult.message = "Berhasil ambil grup whatsapp";
               resolve(finalResult);
@@ -46,7 +47,8 @@ module.exports = {
         message: "",
       };
       try {
-        const socket = await initializeSocket(req.params.sessionId);
+        const sessionId = req.body.sessionId;
+        const socket = await initializeSocket(sessionId);
         await new Promise(async (resolve, reject) => {
           await socket.ev.on("connection.update", async (update) => {
             const { connection, lastDisconnect } = update;
@@ -55,9 +57,8 @@ module.exports = {
               error.status = lastDisconnect?.error?.statusCode;
               reject(error);
             } else if (connection === "open") {
-              console.log("Koneksi berhasil!");
               const groupMetadata = await socket.groupMetadata(
-                req.query.groupId
+                req.body.groupId
               );
               finalResult.data = {
                 ...groupMetadata,
@@ -69,6 +70,8 @@ module.exports = {
               finalResult.success = true;
               finalResult.message = "Berhasil ambil grup whatsapp";
               resolve(finalResult);
+            } else if (connection === "connecting") {
+              console.log("Connecting");
             }
           });
           await socket.ev.on("error", (e) => {
