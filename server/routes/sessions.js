@@ -1,10 +1,11 @@
 const router = require("express").Router();
 const controller = require("../controllers/session");
+const authorization = require("../helpers/authorization");
 
 /* GET Session Whatsapp center page. */
-router.post("/session/status", controller.check.status);
-router.post("/session", controller.create.session);
-router.post("/session/connect", controller.connect);
-router.post("/session/disconnect", controller.disconnect);
+router.post("/", authorization.access, controller.create);
+router.post("/connect", authorization.access, controller.connect);
+router.post("/disconnect", authorization.access, controller.disconnect);
+router.post("/status", authorization.access, controller.check);
 
 module.exports = router;

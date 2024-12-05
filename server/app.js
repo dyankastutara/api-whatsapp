@@ -24,10 +24,11 @@ app.use(responseTime());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 
-app.use("/", routes.sessions);
+app.use("/session", routes.sessions);
 app.use("/contacts", routes.contacts);
 app.use("/groups", routes.groups);
 app.use("/send_message", routes.send_messages);
+app.use("/accounts", routes.accounts);
 
 app.listen(app.get("port"), (error) => {
   if (error) {
