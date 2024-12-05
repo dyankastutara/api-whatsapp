@@ -1,4 +1,4 @@
-const { initializeSocket } = require("../connection");
+const { initializeSocket } = require("../../connection");
 
 module.exports = {
   get: {

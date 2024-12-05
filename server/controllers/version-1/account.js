@@ -1,9 +1,9 @@
 const path = require("path");
 
-const { sessionsFolder, deleteCreds } = require("../connection");
+const { sessionsFolder, deleteCreds } = require("../../connection");
 //DB
-const Account = require("../models/mongodb/account");
-const Session = require("../models/mongodb/session");
+const Account = require("../../models/mongodb/account");
+const Session = require("../../models/mongodb/session");
 
 module.exports = {
   get: async (req, res) => {
@@ -15,7 +15,7 @@ module.exports = {
     };
     try {
       const response = await Account.find({
-        "user.id": req.decoded.id,
+        user: req.decoded.id,
         $or: [{ is_deleted: false }, { is_deleted: { $exists: false } }],
       }).populate({
         path: "sessions",

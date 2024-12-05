@@ -74,10 +74,7 @@ async function initializeSocket(sessionId) {
             status: "connected",
             connected_at: new Date(),
             type: tmp?.type || "",
-            user_id: tmp?.user_id,
-            user: {
-              id: tmp?.user_id,
-            },
+            user: tmp?.user,
           };
           const account = await Account.create(obj);
           await Session.findOneAndUpdate(

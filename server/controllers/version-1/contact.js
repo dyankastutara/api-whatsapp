@@ -1,7 +1,6 @@
 const path = require("path");
-const { initializeSocket } = require("../connection");
-const { removeSuffixID } = require("../helpers/regex");
-// const { extractDeviceJids } = require("@whiskeysockets/baileys");
+const { initializeSocket } = require("../../connection");
+const { removeSuffixID } = require("../../helpers/regex");
 
 async function initializeStore(sessionId) {
   const folderPath = path.join(__dirname, "../../store");

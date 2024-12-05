@@ -5,11 +5,11 @@ const {
   initializeSocket,
   startSession,
   endSession,
-} = require("../connection");
+} = require("../../connection");
 //DB
-const TmpSession = require("../models/mongodb/tmp_session");
-const Session = require("../models/mongodb/session");
-const Account = require("../models/mongodb/account");
+const TmpSession = require("../../models/mongodb/tmp_session");
+const Session = require("../../models/mongodb/session");
+const Account = require("../../models/mongodb/account");
 
 function createSessionId() {
   const timestamp = Date.now();
@@ -38,7 +38,7 @@ module.exports = {
     };
     try {
       const account = await Account.find({
-        "user.id": req.decoded.id,
+        user: req.decoded.id,
       });
       if (account.length >= 6) {
         const error = new Error(
@@ -58,7 +58,7 @@ module.exports = {
       await TmpSession.create({
         session_id: sessionId,
         type: req.body.type,
-        user_id: req.decoded.id,
+        user: req.decoded.id,
       });
       finalResult.sessionId = sessionId;
       finalResult.qrImage = qrImage;

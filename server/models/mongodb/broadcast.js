@@ -24,6 +24,7 @@ const broadcastSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "Account",
     },
+    user: { type: Number },
   },
   {
     timestamps: { createdAt: "created_at", updatedAt: "updated_at" },

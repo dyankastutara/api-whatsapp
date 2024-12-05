@@ -4,26 +4,17 @@ const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 const groupSchema = new Schema(
   {
-    id: { type: String, required: true, unique: true },
+    gid: { type: String },
     subject: { type: String },
     owner: { type: String },
     participants: [
       {
-        id: { type: String, required: true },
+        id: { type: String },
         name: { type: String },
-        phone_number: { type: String, required: true, maxLength: 15 },
+        phone_number: { type: String, maxLength: 15 },
       },
     ],
-    user: {
-      id: { type: Number },
-      name: { type: String },
-      email: { type: String },
-      phone_number: { type: String },
-    },
-    account: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Account",
-    },
+    user: { type: Number },
   },
   {
     timestamps: { createdAt: "created_at", updatedAt: "updated_at" },

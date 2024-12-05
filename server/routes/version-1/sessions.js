@@ -1,6 +1,6 @@
 const router = require("express").Router();
-const controller = require("../controllers/session");
-const authorization = require("../helpers/authorization");
+const controller = require("../../controllers/version-1/session");
+const authorization = require("../../helpers/authorization");
 
 /* GET Session Whatsapp center page. */
 router.post("/", authorization.access, controller.create);

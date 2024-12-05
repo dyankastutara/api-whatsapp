@@ -15,13 +15,7 @@ const accountSchema = new Schema(
     type: { type: String, enum: ["broadcast", "warm", "api", ""] },
     is_deleted: { type: Boolean },
     deleted_at: { type: Date },
-    user_id: { type: Number },
-    user: {
-      id: { type: Number },
-      name: { type: String },
-      email: { type: String },
-      phone_number: { type: String },
-    },
+    user: { type: Number },
   },
   {
     timestamps: { createdAt: "created_at", updatedAt: "updated_at" },

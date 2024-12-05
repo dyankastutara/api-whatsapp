@@ -5,7 +5,7 @@ const cors = require("cors");
 const mongoose = require("mongoose");
 const responseTime = require("response-time");
 // const jsonServer = require("json-server");
-const routes = require("./routes");
+const routesV1 = require("./routes/version-1");
 const app = express();
 const fs = require("fs");
 const path = require("path");
@@ -24,11 +24,11 @@ app.use(responseTime());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 
-app.use("/session", routes.sessions);
-app.use("/contacts", routes.contacts);
-app.use("/groups", routes.groups);
-app.use("/send_message", routes.send_messages);
-app.use("/accounts", routes.accounts);
+app.use("/session", routesV1.sessions);
+app.use("/contacts", routesV1.contacts);
+app.use("/groups", routesV1.groups);
+app.use("/send_message", routesV1.send_messages);
+app.use("/accounts", routesV1.accounts);
 
 app.listen(app.get("port"), (error) => {
   if (error) {
