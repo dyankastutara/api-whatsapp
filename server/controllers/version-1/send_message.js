@@ -23,6 +23,7 @@ module.exports = {
               const send = await socket.sendMessage(jid, {
                 text: req.body.message,
               });
+              await socket.ws.close();
               finalResult.data = send;
               finalResult.success = true;
               finalResult.message = "Berhasil kirim pesan ke penerima";

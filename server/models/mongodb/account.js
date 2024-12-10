@@ -6,7 +6,7 @@ const accountSchema = new Schema(
   {
     jid: { type: String },
     name: { type: String },
-    phone_number: { type: String, maxLength: 20 },
+    phone_number: { type: String, maxLength: 15 },
     status: {
       type: String,
       enum: ["connected", "disconnected", "pending"],
@@ -23,9 +23,9 @@ const accountSchema = new Schema(
 );
 
 accountSchema.virtual("sessions", {
-  ref: "Session", // Nama model Post
-  localField: "_id", // Field pada User
-  foreignField: "account", // Field pada Post yang mereferensi User
+  ref: "Session",
+  localField: "_id",
+  foreignField: "account",
   justOne: true,
 });
 

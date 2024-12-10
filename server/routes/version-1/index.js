@@ -14,4 +14,5 @@ module.exports = {
   groups: require("./groups"),
   send_messages: require("./send_messages"),
   accounts: require("./accounts"),
+  broadcasts: require("./broadcasts"),
 };

@@ -43,14 +43,17 @@ async function initExistingSessions() {
   }
 }
 async function initializeSocket(sessionId) {
-  const sessionPath = path.join(__dirname, `../sessions/${sessionId}`);
+  let finalResult = {
+    error: false,
+    message: "",
+  };
   try {
+    const sessionPath = path.join(__dirname, `../sessions/${sessionId}`);
     const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
     const socket = await makeWASocket({
       auth: state,
       logger: pino({ level: "silent" }),
     });
-
     await socket.ev.on("creds.update", async (creds) => {
       try {
         await saveSession(sessionId, creds);
@@ -142,8 +145,9 @@ async function initializeSocket(sessionId) {
     });
     return socket;
   } catch (err) {
-    console.log(error.message || "Error initialize Socket");
-    return err;
+    finalResult.error = true;
+    finalResult.message = err.message;
+    return finalResult;
   }
 }
 

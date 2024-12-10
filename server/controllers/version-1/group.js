@@ -15,42 +15,33 @@ module.exports = {
       try {
         const sessionId = req.body.sessionId;
         const socket = await initializeSocket(sessionId);
-        await new Promise(async (resolve, reject) => {
-          await socket.ev.on("connection.update", async (update) => {
-            const { connection, lastDisconnect } = update;
-            if (connection === "close") {
-              const error = new Error(lastDisconnect?.error?.message);
-              error.status = lastDisconnect?.error?.statusCode;
-              reject(error);
-            } else if (connection === "open") {
-              const groups = await socket.groupFetchAllParticipating();
-              const user = await socket.user;
-              finalResult.data = Object.values(groups).map((item) => ({
-                id: item.id,
-                subject: item.subject,
-                size: item.size - 1,
-                owner: item.owner,
-                participants: item.participants
-                  .map((value) => ({
-                    ...value,
-                    name: "",
-                    phone_number: value.id.split("@")[0],
-                  }))
-                  .filter(
-                    (participant) => participant.id !== removeSuffixID(user?.id)
-                  ),
-              }));
-              finalResult.success = true;
-              finalResult.message = "Berhasil ambil grup whatsapp";
-              resolve(finalResult);
-            }
-          });
-          await socket.ev.on("error", (e) => {
-            const error = new Error(e.message);
-            error.status = e.statusCode;
-            reject(error);
-          });
-        });
+        if (socket.error) {
+          const error = new Error(socket.message);
+          error.status = 300;
+          throw error;
+        }
+        await socket.waitForConnectionUpdate(
+          ({ connection }) => connection === "open"
+        );
+        const groups = await socket.groupFetchAllParticipating();
+        const user = await socket.user;
+        finalResult.data = Object.values(groups).map((item) => ({
+          id: item.id,
+          subject: item.subject,
+          size: item.size - 1,
+          owner: item.owner,
+          participants: item.participants
+            .map((value) => ({
+              ...value,
+              name: "",
+              phone_number: value.id.split("@")[0],
+            }))
+            .filter(
+              (participant) => participant.id !== removeSuffixID(user?.id)
+            ),
+        }));
+        finalResult.success = true;
+        finalResult.message = "Berhasil ambil grup whatsapp";
         res.status(200).json(finalResult);
       } catch (e) {
         const status = e.status || 500;
@@ -67,42 +58,30 @@ module.exports = {
       try {
         const sessionId = req.body.sessionId;
         const socket = await initializeSocket(sessionId);
-        await new Promise(async (resolve, reject) => {
-          await socket.ev.on("connection.update", async (update) => {
-            const { connection, lastDisconnect } = update;
-            if (connection === "close") {
-              const error = new Error(lastDisconnect?.error?.message);
-              error.status = lastDisconnect?.error?.statusCode;
-              reject(error);
-            } else if (connection === "open") {
-              const groupMetadata = await socket.groupMetadata(
-                req.body.groupId
-              );
-              finalResult.data = {
-                ...groupMetadata,
-                participants: groupMetadata.participants
-                  .map((item) => ({
-                    ...item,
-                    name: "",
-                    phone_number: item.id.split("@")[0],
-                  }))
-                  .filter(
-                    (participant) => participant.id !== removeSuffixID(user?.id)
-                  ),
-              };
-              finalResult.success = true;
-              finalResult.message = "Berhasil ambil grup whatsapp";
-              resolve(finalResult);
-            } else if (connection === "connecting") {
-              console.log("Connecting");
-            }
-          });
-          await socket.ev.on("error", (e) => {
-            const error = new Error(e.message);
-            error.status = e.statusCode;
-            reject(error);
-          });
-        });
+        if (socket.error) {
+          const error = new Error(socket.message);
+          error.status = 300;
+          throw error;
+        }
+        await socket.waitForConnectionUpdate(
+          ({ connection }) => connection === "open"
+        );
+        const groupMetadata = await socket.groupMetadata(req.body.groupId);
+        const user = await socket.user;
+        finalResult.data = {
+          ...groupMetadata,
+          participants: groupMetadata.participants
+            .map((item) => ({
+              ...item,
+              name: "",
+              phone_number: item.id.split("@")[0],
+            }))
+            .filter(
+              (participant) => participant.id !== removeSuffixID(user?.id)
+            ),
+        };
+        finalResult.success = true;
+        finalResult.message = "Berhasil ambil grup whatsapp";
         res.status(200).json(finalResult);
       } catch (e) {
         const status = e.status || 500;
@@ -187,48 +166,42 @@ module.exports = {
       try {
         const { sessionId, groupIds } = req.body;
         const socket = await initializeSocket(sessionId);
-        await new Promise(async (resolve, reject) => {
-          await socket.ev.on("connection.update", async (update) => {
-            const { connection } = update;
-            if (connection === "open") {
-              const groups = await socket.groupFetchAllParticipating();
-              const user = await socket.user;
-              const data = await Object.values(groups)
-                .map((item) => ({
-                  gid: item.id,
-                  subject: item.subject,
-                  owner: item.owner,
-                  user: req.decoded.id,
-                  participants: item.participants
-                    .map((participant) => ({
-                      id: participant.id,
-                      name: "",
-                      phone_number: participant.id.split("@")[0],
-                    }))
-                    .filter(
-                      (participant) =>
-                        participant.id !== removeSuffixID(user?.id)
-                    ),
-                }))
-                .filter((group) => groupIds.includes(group.gid));
-              if (data.length === 0) {
-                const error = new Error("Data Group tidak ditemukan");
-                error.status = 404;
-                reject(error);
-              }
-              await Group.insertMany(data);
-              finalResult.data = data;
-              finalResult.success = true;
-              finalResult.message = "Berhasil tambah data dari grup whatsapp";
-              resolve(finalResult);
-            }
-          });
-          await socket.ev.on("error", (e) => {
-            const error = new Error(e.message);
-            error.status = e.statusCode;
-            reject(error);
-          });
-        });
+        if (socket.error) {
+          const error = new Error(socket.message);
+          error.status = 300;
+          throw error;
+        }
+        await socket.waitForConnectionUpdate(
+          ({ connection }) => connection === "open"
+        );
+        const groups = await socket.groupFetchAllParticipating();
+        const user = await socket.user;
+        const data = await Object.values(groups)
+          .map((item) => ({
+            gid: item.id,
+            subject: item.subject,
+            owner: item.owner,
+            user: req.decoded.id,
+            participants: item.participants
+              .map((participant) => ({
+                id: participant.id,
+                name: "",
+                phone_number: participant.id.split("@")[0],
+              }))
+              .filter(
+                (participant) => participant.id !== removeSuffixID(user?.id)
+              ),
+          }))
+          .filter((group) => groupIds.includes(group.gid));
+        if (data.length === 0) {
+          const error = new Error("Data Group tidak ditemukan");
+          error.status = 404;
+          throw error;
+        }
+        await Group.insertMany(data);
+        finalResult.data = data;
+        finalResult.success = true;
+        finalResult.message = "Berhasil tambah data dari grup whatsapp";
         res.status(200).json(finalResult);
       } catch (e) {
         const status = e.status || 500;
