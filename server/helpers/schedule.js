@@ -17,55 +17,60 @@ async function sendMessage(message, sender) {
       const error = new Error(socket.message);
       throw error;
     }
-    // await socket.waitForConnectionUpdate(
-    //   ({ connection }) => connection === "open"
-    // );
-    // const jid = message.receiver + "@s.whatsapp.net";
-    // if (message.mimetype) {
-    //   const file_type = message.mimetype.split("/")[0];
-    //   if (file_type === "image") {
-    //     await socket.sendMessage(
-    //       jid,
-    //       {
-    //         image: { url: message.url },
-    //         fileName: message.filename,
-    //         mimetype: message.mimetype,
-    //         caption: message.message,
-    //       },
-    //       {
-    //         broadcast: true,
-    //       }
-    //     );
-    //   } else {
-    //     await socket.sendMessage(
-    //       jid,
-    //       {
-    //         document: { url: message.url },
-    //         fileName: message.fileName,
-    //         mimetype: message.mimetype,
-    //         caption: message.message,
-    //       },
-    //       {
-    //         broadcast: true,
-    //       }
-    //     );
-    //   }
-    // } else {
-    //   await socket.sendMessage(
-    //     jid,
-    //     {
-    //       text: message.message,
-    //     },
-    //     {
-    //       broadcast: true,
-    //     }
-    //   );
-    // }
+    await socket.waitForConnectionUpdate(
+      ({ connection }) => connection === "open"
+    );
+    const jid = message.receiver + "@s.whatsapp.net";
+    let msgId = "";
+    if (message.mimetype) {
+      const file_type = message.mimetype.split("/")[0];
+      if (file_type === "image") {
+        const sendMsg = await socket.sendMessage(
+          jid,
+          {
+            image: { url: message.url },
+            fileName: message.filename,
+            mimetype: message.mimetype,
+            caption: message.message,
+          },
+          {
+            broadcast: true,
+          }
+        );
+        msgId = sendMsg?.key?.id;
+      } else {
+        const sendMsg = await socket.sendMessage(
+          jid,
+          {
+            document: { url: message.url },
+            fileName: message.fileName,
+            mimetype: message.mimetype,
+            caption: message.message,
+          },
+          {
+            broadcast: true,
+          }
+        );
+        msgId = sendMsg?.key?.id;
+      }
+    } else {
+      const sendMsg = await socket.sendMessage(
+        jid,
+        {
+          text: message.message,
+        },
+        {
+          broadcast: true,
+        }
+      );
+      msgId = sendMsg?.key?.id;
+    }
     await Message.findOneAndUpdate(
       {
         _id: message._id,
       },
       {
+        mid: msgId,
         sender: sender.account._id,
         sent: true,
         sent_at: moment().tz("Asia/Jakarta"),
@@ -75,9 +80,8 @@ async function sendMessage(message, sender) {
     return e;
   }
 }
-const funcMessage = async (broadcast) => {
+const funcMessage = async (broadcast, val) => {
   try {
-    console.log("func message ke panggil");
     const senders = broadcast.senders;
     const messages = await Message.find({
       broadcast: broadcast._id,
@@ -91,7 +95,6 @@ const funcMessage = async (broadcast) => {
       }).sort({ sent_at: -1 });
       if (!lastMessage) {
         await sendMessage(messages[i], senders[senderIndex]);
-        console.log("Chat terkirim last message");
         await funcMessage(broadcast);
         break;
       } else {
@@ -101,25 +104,16 @@ const funcMessage = async (broadcast) => {
           const diff = now.diff(sentTime, "seconds");
           if (diff > broadcast.delay.wait) {
             await sendMessage(messages[i], senders[senderIndex]);
-            console.log(
-              "Chat terkirim else last message diff > broadcast.delay.wait"
-            );
           } else {
             await new Promise((resolve) =>
               setTimeout(async () => {
                 await funcMessage(broadcast);
-                console.log(
-                  "Chat terkirim else last message else diff > broadcast.delay.wait"
-                );
                 resolve();
               }, broadcast.delay.wait * 1000)
             );
             break;
           }
         } else {
-          console.log(
-            "Chat terkirim else last message else broadcast.delay.wait"
-          );
           await sendMessage(messages[i], senders[senderIndex]);
         }
       }
@@ -129,11 +123,7 @@ const funcMessage = async (broadcast) => {
           sent: true,
         });
         const stopped = count_sent % broadcast.rest_mode.stop_sending_after;
-        console.log("stop sending after", count_sent, stopped);
         if (stopped === 0) {
-          console.log(
-            `Rest Mode Aktif, Delay ${broadcast.rest_mode.and_rest_for} Detik`
-          );
           await new Promise((resolve) =>
             setTimeout(resolve, broadcast.rest_mode.and_rest_for * 1000)
           );
@@ -162,14 +152,9 @@ const funcBroadcast = async () => {
 module.exports = {
   send_broadcast: (done) => {
     const actionFunction = async () => {
-      console.log("cronjob run setiap 1 menit dengan sebelum mutex");
       const release = await mutex.acquire();
       try {
         const broadcasts = await funcBroadcast();
-        console.log(
-          "cronjob run setiap 1 menit dengan setelah mutex",
-          broadcasts.length
-        );
         for (let broadcast of broadcasts) {
           const check_messages = broadcast.messages.filter(
             (message) => !message.sent
