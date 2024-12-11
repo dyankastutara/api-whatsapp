@@ -1,6 +1,7 @@
 const path = require("path");
 const { initializeSocket } = require("../../connection");
 const { removeSuffixID } = require("../../helpers/regex");
+const Group = require("../../models/mongodb/group");
 
 async function initializeStore(sessionId) {
   const folderPath = path.join(__dirname, "../../store");
@@ -13,6 +14,28 @@ async function initializeStore(sessionId) {
 }
 
 module.exports = {
+  count: async (req, res) => {
+    let finalResult = {
+      total: 0,
+      success: false,
+      message: "",
+    };
+    try {
+      const groups = await Group.find({
+        user: req.decoded.id,
+        $or: [{ deleted: false }, { deleted: { $exists: false } }],
+      });
+      const contacts = await groups.flatMap((group) => group.participants);
+      finalResult.total = contacts.length;
+      finalResult.success = true;
+      finalResult.message = "Berhasil mendapatkan data total kontak";
+      res.status(200).json(finalResult);
+    } catch (e) {
+      const status = e.status || 500;
+      finalResult.message = e.message || "Internal server error";
+      res.status(status).json(finalResult);
+    }
+  },
   check: {
     phone_number: async (req, res) => {
       let finalResult = {

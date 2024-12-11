@@ -8,6 +8,6 @@ router.get("/", authorization.access, controller.get.all);
 router.get("/:id", authorization.access, controller.get.by_id);
 
 router.post("/", authorization.access, uploadFile.any(), controller.create);
-// router.post("/", authorization.access, controller.create);
+router.delete("/:id", authorization.access, controller.delete);
 
 module.exports = router;

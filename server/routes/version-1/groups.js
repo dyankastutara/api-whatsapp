@@ -20,4 +20,18 @@ router.post(
   controller.add.sync_with_ids
 );
 router.post("/:id/contacts", authorization.access, controller.add.contacts);
+
+router.patch("/:id", authorization.access, controller.update.by_id);
+router.patch(
+  "/:id/contact/:contact_id",
+  authorization.access,
+  controller.update.contact
+);
+
+router.delete("/:id", authorization.access, controller.delete.by_id);
+router.delete(
+  "/:id/contact/:contact_id",
+  authorization.access,
+  controller.delete.contact
+);
 module.exports = router;

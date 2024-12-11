@@ -13,7 +13,7 @@ const accountSchema = new Schema(
     },
     connected_at: { type: Date },
     type: { type: String, enum: ["broadcast", "warm", "api", ""] },
-    is_deleted: { type: Boolean },
+    deleted: { type: Boolean, default: false },
     deleted_at: { type: Date },
     user: { type: Number },
   },

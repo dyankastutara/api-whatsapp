@@ -14,6 +14,8 @@ const groupSchema = new Schema(
         phone_number: { type: String, maxLength: 15 },
       },
     ],
+    deleted: { type: Boolean, default: false },
+    deleted_at: { type: Date },
     user: { type: Number },
   },
   {

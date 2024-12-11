@@ -1,5 +1,5 @@
 const path = require("path");
-
+const moment = require("moment-timezone");
 const { sessionsFolder, deleteCreds } = require("../../connection");
 //DB
 const Account = require("../../models/mongodb/account");
@@ -16,7 +16,7 @@ module.exports = {
     try {
       const response = await Account.find({
         user: req.decoded.id,
-        $or: [{ is_deleted: false }, { is_deleted: { $exists: false } }],
+        $or: [{ deleted: false }, { deleted: { $exists: false } }],
       }).populate({
         path: "sessions",
         select: "session_id last_active",
@@ -45,7 +45,6 @@ module.exports = {
     try {
       const account = await Account.findOne({
         _id: req.params.id,
-        $or: [{ is_deleted: false }, { is_deleted: { $exists: false } }],
       }).populate({
         path: "sessions",
         select: "session_id last_active",
@@ -61,8 +60,8 @@ module.exports = {
           _id: req.params.id,
         },
         {
-          is_deleted: true,
-          deleted_at: new Date(),
+          deleted: true,
+          deleted_at: moment().tz("Asia/Jakarta"),
         }
       );
       const sessionPath = await path.join(

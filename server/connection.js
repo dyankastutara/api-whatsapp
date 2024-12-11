@@ -139,7 +139,6 @@ async function initializeSocket(sessionId) {
               throw new Error(message);
             }
           }
-          console.log("Logged Out", sessionId);
         }
       }
     });

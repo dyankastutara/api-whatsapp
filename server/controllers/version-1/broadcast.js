@@ -1,6 +1,5 @@
 const moment = require("moment-timezone");
 
-const { initializeSocket } = require("../../connection");
 const Broadcast = require("../../models/mongodb/broadcast");
 const Group = require("../../models/mongodb/group");
 const Message = require("../../models/mongodb/message");
@@ -158,6 +157,7 @@ module.exports = {
         resolve(res);
       });
       const jsonBody = {
+        bid: Date.now() + "@broadcast",
         name,
         senders: JSON.parse(senders || "[]"),
         groups: JSON.parse(groups || "[]"),
@@ -217,6 +217,36 @@ module.exports = {
       };
       finalResult.success = true;
       finalResult.message = "Berhasil tambah broadcast";
+      res.status(200).json(finalResult);
+    } catch (e) {
+      const status = e.status || 500;
+      finalResult.message = e.message || "Internal server error";
+      res.status(status).json(finalResult);
+    }
+  },
+  delete: async (req, res) => {
+    let finalResult = {
+      data: {},
+      success: false,
+      message: "",
+    };
+    try {
+      const broadcast = await Broadcast.findOne({
+        _id: req.params.id,
+      });
+      if (!broadcast) {
+        const error = new Error(
+          "Dokumen gagal dihapus. Dokumen tidak ditemukan"
+        );
+        error.status = 404;
+        throw error;
+      }
+      broadcast.deleted = true;
+      broadcast.deleted_at = moment().tz("Asia/Jakarta");
+      await broadcast.save();
+      finalResult.data = broadcast;
+      finalResult.success = true;
+      finalResult.message = "Berhasil hapus broadcast";
       res.status(200).json(finalResult);
     } catch (e) {
       const status = e.status || 500;

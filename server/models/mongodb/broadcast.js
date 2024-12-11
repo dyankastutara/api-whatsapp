@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 const broadcastSchema = new Schema(
   {
+    bid: { type: String },
     name: { type: String },
     senders: [
       {
@@ -42,7 +43,7 @@ const broadcastSchema = new Schema(
         ],
       },
     ],
-    is_deleted: { type: Boolean },
+    deleted: { type: Boolean, default: false },
     deleted_at: { type: Date },
     delay: {
       // seconds

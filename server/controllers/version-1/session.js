@@ -6,6 +6,7 @@ const {
   startSession,
   endSession,
 } = require("../../connection");
+const { removeSuffixID } = require("../../helpers/regex");
 //DB
 const TmpSession = require("../../models/mongodb/tmp_session");
 const Session = require("../../models/mongodb/session");
@@ -39,6 +40,7 @@ module.exports = {
     try {
       const account = await Account.find({
         user: req.decoded.id,
+        $or: [{ deleted: false }, { deleted: { $exists: false } }],
       });
       if (account.length >= 6) {
         const error = new Error(
@@ -73,6 +75,7 @@ module.exports = {
   },
   check: async (req, res) => {
     let finalResult = {
+      user: {},
       status: "",
       connected: false,
       success: false,
@@ -112,6 +115,12 @@ module.exports = {
             error.status = lastDisconnect?.error?.statusCode;
             reject(error);
           } else if (connection === "open") {
+            const user = await socket.user;
+            finalResult.user = {
+              ...user,
+              jid: removeSuffixID(user.id),
+              phone_number: user.id.split(":")[0],
+            };
             finalResult.status = "connected";
             finalResult.connected = true;
             finalResult.success = true;
