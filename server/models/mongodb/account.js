@@ -9,7 +9,7 @@ const accountSchema = new Schema(
     phone_number: { type: String, maxLength: 15 },
     status: {
       type: String,
-      enum: ["connected", "disconnected", "pending"],
+      enum: ["connected", "disconnected", "pending", "deleted"],
     },
     connected_at: { type: Date },
     type: { type: String, enum: ["broadcast", "warm", "api", ""] },

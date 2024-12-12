@@ -2,7 +2,7 @@
 require("dotenv").config();
 const { Mutex } = require("async-mutex");
 const { CronJob } = require("cron");
-const { initializeSocket } = require("../connection");
+const { initializeSocket } = require("../wa-connection");
 const Broadcast = require("../models/mongodb/broadcast");
 const Message = require("../models/mongodb/message");
 const moment = require("moment-timezone");
@@ -102,14 +102,18 @@ const funcMessage = async (broadcast, val) => {
           const now = moment.tz("Asia/Jakarta");
           const sentTime = moment.tz(lastMessage.sent_at, "Asia/Jakarta");
           const diff = now.diff(sentTime, "seconds");
-          if (diff > broadcast.delay.wait) {
+          const delay =
+            Math.floor(
+              Math.random() * (broadcast.delay.to - broadcast.delay.wait + 1)
+            ) + broadcast.delay.wait;
+          if (diff > delay) {
             await sendMessage(messages[i], senders[senderIndex]);
           } else {
             await new Promise((resolve) =>
               setTimeout(async () => {
                 await funcMessage(broadcast);
                 resolve();
-              }, broadcast.delay.wait * 1000)
+              }, delay * 1000)
             );
             break;
           }

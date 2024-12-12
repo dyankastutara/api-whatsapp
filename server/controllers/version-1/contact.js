@@ -1,5 +1,5 @@
 const path = require("path");
-const { initializeSocket } = require("../../connection");
+const { initializeSocket } = require("../../wa-connection");
 const { removeSuffixID } = require("../../helpers/regex");
 const Group = require("../../models/mongodb/group");
 

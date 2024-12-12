@@ -1,4 +1,4 @@
-const { initializeSocket } = require("../../connection");
+const { initializeSocket } = require("../../wa-connection");
 
 module.exports = {
   send_message: {

@@ -5,7 +5,7 @@ const {
   initializeSocket,
   startSession,
   endSession,
-} = require("../../connection");
+} = require("../../wa-connection");
 const { removeSuffixID } = require("../../helpers/regex");
 //DB
 const TmpSession = require("../../models/mongodb/tmp_session");
@@ -60,6 +60,7 @@ module.exports = {
       await TmpSession.create({
         session_id: sessionId,
         type: req.body.type,
+        status: "create",
         user: req.decoded.id,
       });
       finalResult.sessionId = sessionId;
@@ -170,6 +171,12 @@ module.exports = {
         error.status = 500;
         throw error;
       }
+      await TmpSession.create({
+        session_id: sessionId,
+        type: session.account.type,
+        status: "connect",
+        user: req.decoded.id,
+      });
       finalResult.sessionId = sessionId;
       finalResult.qrImage = qrImage;
       finalResult.success = true;

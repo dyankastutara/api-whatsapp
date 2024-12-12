@@ -121,6 +121,7 @@ module.exports = {
         delay,
         rest_mode,
         perfect_timing,
+        sending_speed,
       } = req.body;
       const contents = await new Promise((resolve, reject) => {
         const res = req.body.contents.map((content, index) => {
@@ -163,8 +164,20 @@ module.exports = {
         groups: JSON.parse(groups || "[]"),
         contents,
         time_to_send: await timeToSend(time_to_send),
-        delay: JSON.parse(delay || "{}"),
-        rest_mode: JSON.parse(rest_mode || "{}"),
+        delay:
+          sending_speed === "auto"
+            ? {
+                wait: 10,
+                to: 90,
+              }
+            : JSON.parse(delay || "{}"),
+        rest_mode:
+          sending_speed === "auto"
+            ? {
+                stop_sending_after: 20,
+                and_rest_for: 90,
+              }
+            : JSON.parse(rest_mode || "{}"),
         perfect_timing: perfect_timing === "true",
         status,
       };

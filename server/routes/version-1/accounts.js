@@ -4,6 +4,7 @@ const authorization = require("../../helpers/authorization");
 
 /* GET Session Whatsapp center page. */
 router.get("/", authorization.access, controller.get);
+router.patch("/:id", authorization.access, controller.update);
 router.delete("/:id", authorization.access, controller.delete);
 
 module.exports = router;

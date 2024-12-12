@@ -1,4 +1,4 @@
-const { initializeSocket } = require("../../connection");
+const { initializeSocket } = require("../../wa-connection");
 const { removeSuffixID } = require("../../helpers/regex");
 const moment = require("moment-timezone");
 //DB
