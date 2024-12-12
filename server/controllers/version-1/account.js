@@ -37,34 +37,66 @@ module.exports = {
       res.status(status).json(finalResult);
     }
   },
-  update: async (req, res) => {
-    const finalResult = {
-      data: {},
-      success: false,
-      message: "",
-    };
-    try {
-      const account = await Account.findOne({
-        _id: req.params.id,
-        $or: [{ deleted: false }, { deleted: { $exists: false } }],
-      });
-      if (!account) {
-        const error = new Error("Akun WhatsApp tidak ditemukan");
-        error.status = 404;
-        throw error;
+  update: {
+    single: async (req, res) => {
+      const finalResult = {
+        data: {},
+        success: false,
+        message: "",
+      };
+      try {
+        const account = await Account.findOne({
+          _id: req.params.id,
+          $or: [{ deleted: false }, { deleted: { $exists: false } }],
+        });
+        if (!account) {
+          const error = new Error("Akun WhatsApp tidak ditemukan");
+          error.status = 404;
+          throw error;
+        }
+        account.name = req.body.name || account.name;
+        account.type = req.body.type || account.type;
+        await account.save();
+        finalResult.data = account;
+        finalResult.success = true;
+        finalResult.message = "Akun WhatsApp berhasil diubah";
+        res.status(200).json(finalResult);
+      } catch (e) {
+        const status = e.status || 500;
+        finalResult.message = e.message || "Internal server error";
+        res.status(status).json(finalResult);
       }
-      account.name = req.body.name || account.name;
-      account.type = req.body.type || account.type;
-      await account.save();
-      finalResult.data = account;
-      finalResult.success = true;
-      finalResult.message = "Alun WhatsApp berhasil diubah";
-      res.status(200).json(finalResult);
-    } catch (e) {
-      const status = e.status || 500;
-      finalResult.message = e.message || "Internal server error";
-      res.status(status).json(finalResult);
-    }
+    },
+    assign: async (req, res) => {
+      const finalResult = {
+        data: {},
+        success: false,
+        message: "",
+      };
+      try {
+        const update = await Account.updateMany(
+          {
+            _id: { $in: req.body.ids },
+          },
+          {
+            type: req.body.type,
+          }
+        );
+        if (update.matchedCount === 0) {
+          const error = new Error("Akun WhatsApp tidak ditemukan");
+          error.status = 404;
+          throw error;
+        }
+        finalResult.data = update;
+        finalResult.success = true;
+        finalResult.message = `${update.matchedCount} Akun WhatsApp berhasil diubah`;
+        res.status(200).json(finalResult);
+      } catch (e) {
+        const status = e.status || 500;
+        finalResult.message = e.message || "Internal server error";
+        res.status(status).json(finalResult);
+      }
+    },
   },
   delete: async (req, res) => {
     const finalResult = {
