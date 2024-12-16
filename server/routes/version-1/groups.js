@@ -32,6 +32,16 @@ router.delete("/:id", authorization.access, controller.delete.by_id);
 router.delete(
   "/:id/contact/:contact_id",
   authorization.access,
-  controller.delete.contact
+  controller.delete.participant
+);
+router.post(
+  "/delete/multiple-ids",
+  authorization.access,
+  controller.delete.multiple_ids
+);
+router.post(
+  "/:id/contact/delete/multiple-ids",
+  authorization.access,
+  controller.delete.multiple_participants_ids
 );
 module.exports = router;

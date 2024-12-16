@@ -13,6 +13,7 @@ const { removeSuffixID } = require("./helpers/regex");
 const {
   notifyWaAccountConnected,
   notifiWaAccountDisconnect,
+  notifyWaAccountQR,
 } = require("./socket.io-connection");
 // DB
 const Session = require("./models/mongodb/session");
@@ -42,7 +43,7 @@ async function initExistingSessions() {
   for (const sessionId of folders_name) {
     const sessionPath = path.join(sessionsFolder, sessionId);
     if (sessionId && fs.lstatSync(sessionPath).isDirectory()) {
-      await initializeSocket(sessionId);
+      const socket = await initializeSocket(sessionId);
     }
   }
 }
@@ -61,7 +62,9 @@ async function initializeSocket(sessionId) {
     await socket.ev.on("creds.update", async (creds) => {
       try {
         await saveSession(sessionId, creds);
-        await saveCreds();
+        if (fs.existsSync(sessionPath)) {
+          await saveCreds();
+        }
       } catch (err) {
         console.log("creds.update Error: ", err);
       }
@@ -94,13 +97,14 @@ async function initializeSocket(sessionId) {
             notifyWaAccountConnected(account._doc.user, {
               ...account._doc,
               sessions: session,
+              connection_type: "create",
             });
           }
           if (tmp.status === "connect") {
             const active_at = moment().tz("Asia/Jakarta");
             const session = await Session.findOne({
               session_id: sessionId,
-            });
+            }).populate({ path: "account" });
             session.last_active = active_at;
             await session.save();
             const account = await Account.findOne({
@@ -108,10 +112,15 @@ async function initializeSocket(sessionId) {
             });
             account.status = "connected";
             account.connected_at = active_at;
+            if (session.account.jid !== removeSuffixID(user.id)) {
+              account.jid = removeSuffixID(user.id);
+              account.phone_number = user.id.split(":")[0];
+            }
             await account.save();
             notifyWaAccountConnected(account.user, {
               ...account._doc,
               sessions: session,
+              connection_type: "connect",
             });
           }
           await TmpSession.findOneAndDelete({
@@ -149,18 +158,18 @@ async function initializeSocket(sessionId) {
           const session = await Session.findOne({
             session_id: sessionId,
           });
-          const account = await Account.findOneAndUpdate(
-            {
+          if (session?.account) {
+            const account = await Account.findOne({
               _id: session.account,
-            },
-            {
-              status: "disconnected",
-              connected_at: null,
-            }
-          );
-          account.status = "disconnected";
-          account.connected_at = null;
-          await account.save();
+            });
+            account.status = "disconnected";
+            account.connected_at = null;
+            await account.save();
+            await notifiWaAccountDisconnect(account.user, {
+              ...account._doc,
+              sessions: session,
+            });
+          }
           if (fs.existsSync(sessionPath)) {
             const { error, message } = await deleteCreds(sessionId);
             if (error) {
@@ -177,7 +186,7 @@ async function initializeSocket(sessionId) {
     return finalResult;
   }
 }
-async function startSession(sessionId) {
+async function startSession(sessionId, user_id) {
   let finalResult = {
     qrImage: "",
     error: false,
@@ -189,14 +198,16 @@ async function startSession(sessionId) {
     return new Promise(async (resolve, reject) => {
       // Event saat QR code tersedia
       await socket.ev.on("connection.update", async (update) => {
-        const { qr, lastDisconnect, isNewLogin } = update;
+        const { qr, lastDisconnect, connection } = update;
         if (qr) {
           try {
+            console.log("session start qr");
             qrterminal.generate(qr, { small: true });
             const qrImage = await qrcode.toDataURL(qr);
             finalResult.qrImage = qrImage;
             finalResult.success = true;
             finalResult.message = "QR Code berhasil dibuat untuk session";
+            await notifyWaAccountQR(user_id, finalResult);
             resolve(finalResult);
           } catch (err) {
             reject(err);
@@ -225,30 +236,49 @@ async function endSession(sessionId) {
   };
   try {
     const socket = await initializeSocket(sessionId);
-    await socket.waitForConnectionUpdate(
-      ({ connection }) => connection === "open"
-    );
-    console.log("Socket endSession open");
-    const session = await Session.findOne({ session_id: sessionId });
-    await Account.findOneAndUpdate(
-      {
-        _id: session.account,
-      },
-      {
-        status: "disconnect",
-        connected_at: null,
-      }
-    );
-    await socket.logout();
-    await socket.ev.on("error", (e) => {
-      console.log(e);
-      const error = new Error(e.message);
-      throw error;
+    return new Promise(async (resolve, reject) => {
+      // Event saat QR code tersedia
+      await socket.ev.on("connection.update", async (update) => {
+        const { connection, lastDisconnect, qr } = update;
+        if (qr) {
+          const session = await Session.findOne({
+            session_id: sessionId,
+          });
+          if (session?.account) {
+            const account = await Account.findOne({
+              _id: session.account,
+            });
+            account.status = "disconnected";
+            account.connected_at = null;
+            await account.save();
+          }
+          finalResult.success = true;
+          finalResult.message = "Sesi Anda telah diakhiri. Logout berhasil.";
+          resolve(finalResult);
+        }
+        if (connection === "open") {
+          await socket.logout();
+          const session = await Session.findOne({ session_id: sessionId });
+          await Account.findOneAndUpdate(
+            {
+              _id: session.account,
+            },
+            {
+              status: "disconnected",
+              connected_at: null,
+            }
+          );
+          finalResult.success = true;
+          finalResult.message = "Sesi Anda telah diakhiri. Logout berhasil.";
+          resolve(finalResult);
+        }
+      });
+      await socket.ev.on("error", (e) => {
+        console.log(e);
+        const error = new Error(e.message);
+        reject(error);
+      });
     });
-
-    finalResult.success = true;
-    finalResult.message = "Sesi Anda telah diakhiri. Logout berhasil.";
-    return finalResult;
   } catch (err) {
     finalResult.error = true;
     finalResult.message = err.message || "Sesi Anda gagal diakhiri.";

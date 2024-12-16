@@ -188,7 +188,9 @@ module.exports = {
         ...jsonBody,
         user: req.decoded.id,
       });
-      const participants = group_documents.flatMap((item) => item.participants);
+      const participants = group_documents.flatMap((item) =>
+        item.participants.filter((participant) => !participant.deleted)
+      );
       const messages = contents.flatMap((item) => {
         // Membuat array baru dengan message utama
         const messages = [

@@ -7,7 +7,7 @@ const io = new Server(process.env.PORT_SOCKET_IO, {
   },
 });
 
-const userSockets = {};
+let userSockets = {};
 const initializeSocketIo = () => {
   // Socket.IO logic
   io.on("connection", (socket) => {
@@ -18,7 +18,7 @@ const initializeSocketIo = () => {
     });
     socket.on("disconnect", () => {
       for (const [userId, sId] of Object.entries(userSockets)) {
-        if (sId === socketId) {
+        if (sId === socket.id) {
           delete userSockets[userId];
           console.log(`User ${userId} disconnected`);
           break;
@@ -32,16 +32,14 @@ const notifyWaAccountConnected = (userId, account) => {
   const socketId = userSockets[userId];
   if (socketId) {
     io.to(socketId).emit("wa_account_connected", account);
-    console.log(`Sent update to user ${userId}:`, account);
-  } else {
-    console.log(`User ${userId} is not connected`);
+    console.log(`wa_account_connected: ${userId}`);
   }
 };
 const notifiWaAccountDisconnect = (userId, account) => {
   const socketId = userSockets[userId];
   if (socketId) {
     io.to(socketId).emit("wa_account_disconnected", account);
-    console.log(`Sent update to user ${userId}:`, account);
+    console.log(`wa_account_disconnected: ${userId}`);
     for (const [userId, sId] of Object.entries(userSockets)) {
       if (sId === socketId) {
         delete userSockets[userId];
@@ -49,12 +47,18 @@ const notifiWaAccountDisconnect = (userId, account) => {
         break;
       }
     }
-  } else {
-    console.log(`User ${userId} is not connected`);
+  }
+};
+const notifyWaAccountQR = (userId, account) => {
+  const socketId = userSockets[userId];
+  if (socketId) {
+    io.to(socketId).emit("wa_account_qr", account);
+    console.log(`wa_account_qr: ${userId}`);
   }
 };
 module.exports = {
   initializeSocketIo,
   notifyWaAccountConnected,
   notifiWaAccountDisconnect,
+  notifyWaAccountQR,
 };

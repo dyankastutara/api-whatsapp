@@ -34,6 +34,7 @@ module.exports = {
             .map((value) => ({
               ...value,
               name: "",
+              subscribed: true,
               phone_number: value.id.split("@")[0],
             }))
             .filter(
@@ -74,6 +75,7 @@ module.exports = {
             .map((item) => ({
               ...item,
               name: "",
+              subscribed: true,
               phone_number: item.id.split("@")[0],
             }))
             .filter(
@@ -94,15 +96,56 @@ module.exports = {
     all: async (req, res) => {
       let finalResult = {
         data: [],
+        currentPage: 0,
+        totalPages: 0,
+        totalDocuments: 0,
         success: false,
         message: "",
       };
       try {
-        const response = await Group.find({
+        const { page, limit, search } = req.query;
+        const isPaginationEnabled = page && limit;
+        let query = {};
+        let paginatedData;
+        // Jika filter nama diberikan, gunakan regex untuk mencari nama mendekati
+        if (search) {
+          const keywords = search.split(" "); // Pecah nama menjadi kata-kata
+          query.subject = {
+            $regex: keywords.map((word) => `(?=.*${word})`).join(""), // Gabungkan regex untuk setiap kata
+            $options: "i", // Case-insensitive
+          };
+        }
+        if (isPaginationEnabled) {
+          const currentPage = parseInt(page) || 1;
+          const perPage = parseInt(limit) || 10;
+          const skip = (currentPage - 1) * perPage;
+          paginatedData = await Group.find({
+            user: req.decoded.id,
+            $or: [{ deleted: false }, { deleted: { $exists: false } }],
+            ...query,
+          })
+            .skip(skip)
+            .limit(perPage);
+        } else {
+          paginatedData = await Group.find({
+            user: req.decoded.id,
+            $or: [{ deleted: false }, { deleted: { $exists: false } }],
+            ...query,
+          });
+        }
+        const totalDocuments = await Group.countDocuments({
           user: req.decoded.id,
           deleted: false,
+          ...query,
         });
-        finalResult.data = response;
+        finalResult.data = paginatedData;
+        finalResult.currentPage = isPaginationEnabled
+          ? parseInt(page) || 1
+          : null;
+        finalResult.totalPages = isPaginationEnabled
+          ? Math.ceil(totalDocuments / (parseInt(limit) || 10))
+          : null;
+        finalResult.totalDocuments = totalDocuments;
         finalResult.success = true;
         finalResult.message = "Berhasil ambil data grup";
         res.status(200).json(finalResult);
@@ -188,6 +231,7 @@ module.exports = {
                 id: participant.id,
                 name: "",
                 phone_number: participant.id.split("@")[0],
+                subscribed: true,
               }))
               .filter(
                 (participant) => participant.id !== removeSuffixID(user?.id)
@@ -290,6 +334,7 @@ module.exports = {
         message: "",
       };
       try {
+        console.log(req.body);
         const group = await Group.findOne({
           _id: req.params.id,
         });
@@ -364,7 +409,39 @@ module.exports = {
         res.status(status).json(finalResult);
       }
     },
-    contact: async (req, res) => {
+    multiple_ids: async (req, res) => {
+      const finalResult = {
+        ids: [],
+        success: false,
+        message: "",
+      };
+      try {
+        const groups = await Group.find({
+          _id: { $in: req.body.ids },
+          $or: [{ deleted: false }, { deleted: { $exists: false } }],
+        });
+        if (groups.length === 0) {
+          const error = new Error("Group WhatsApp tidak ditemukan");
+          error.status = 404;
+          throw error;
+        }
+        for (let group of groups) {
+          group.deleted = true;
+          group.deleted_at = moment().tz("Asia/Jakarta");
+          await group.save();
+        }
+        const deleted_ids = groups.map((item) => item._id);
+        finalResult.ids = deleted_ids;
+        finalResult.success = true;
+        finalResult.message = `${deleted_ids.length} group berhasil dihapus`;
+        res.status(200).json(finalResult);
+      } catch (e) {
+        const status = e.status || 500;
+        finalResult.message = e.message || "Internal server error";
+        res.status(status).json(finalResult);
+      }
+    },
+    participant: async (req, res) => {
       let finalResult = {
         data: {},
         success: false,
@@ -399,6 +476,44 @@ module.exports = {
         finalResult.data = group;
         finalResult.success = true;
         finalResult.message = "Berhasil hapus kontak";
+        res.status(200).json(finalResult);
+      } catch (e) {
+        const status = e.status || 500;
+        finalResult.message = e.message || "Internal server error";
+        res.status(status).json(finalResult);
+      }
+    },
+    multiple_participants_ids: async (req, res) => {
+      let finalResult = {
+        data: {},
+        success: false,
+        message: "",
+      };
+      try {
+        const group = await Group.findOne({
+          _id: req.params.id,
+        });
+        if (!group) {
+          const error = new Error("Dokumen tidak ditemukan");
+          error.status = 404;
+          throw error;
+        }
+        const check_participant = group.participants.find((participant) =>
+          req.body.participant_ids.includes(participant.id)
+        );
+        if (!check_participant) {
+          const error = new Error(`Hapus kontak gagal. Kontak tidak ditemukan`);
+          error.status = 404;
+          throw error;
+        }
+        const tmp_participants = group.participants.filter(
+          (item) => !req.body.participant_ids.includes(item.id)
+        );
+        group.participants = tmp_participants;
+        await group.save();
+        finalResult.data = group;
+        finalResult.success = true;
+        finalResult.message = `${req.body.participant_ids.length} kontak berhasil dihapus`;
         res.status(200).json(finalResult);
       } catch (e) {
         const status = e.status || 500;

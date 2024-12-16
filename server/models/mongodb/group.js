@@ -12,6 +12,7 @@ const groupSchema = new Schema(
         id: { type: String },
         name: { type: String },
         phone_number: { type: String, maxLength: 15 },
+        subscribed: { type: Boolean, default: true },
       },
     ],
     deleted: { type: Boolean, default: false },

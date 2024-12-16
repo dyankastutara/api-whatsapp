@@ -17,13 +17,17 @@ module.exports = {
       const response = await Account.find({
         user: req.decoded.id,
         $or: [{ deleted: false }, { deleted: { $exists: false } }],
-      }).populate({
-        path: "sessions",
-        select: "session_id last_active",
-      });
+      })
+        .sort({
+          connected_at: -1,
+        })
+        .populate({
+          path: "sessions",
+          select: "session_id last_active",
+        });
       if (!response || response.length === 0) {
         const error = new Error("Data Nomor WhatsApp tidak ditemukan");
-        error.status = 404;
+        error.status = 200;
         throw error;
       }
       finalResult.data = response;
@@ -98,52 +102,106 @@ module.exports = {
       }
     },
   },
-  delete: async (req, res) => {
-    const finalResult = {
-      success: false,
-      message: "",
-    };
-    try {
-      const account = await Account.findOne({
-        _id: req.params.id,
-        $or: [{ deleted: false }, { deleted: { $exists: false } }],
-      }).populate({
-        path: "sessions",
-        select: "session_id last_active",
-      });
-      if (!account) {
-        const error = new Error("Akun WhatsApp tidak ditemukan");
-        error.status = 404;
-        throw error;
+  delete: {
+    by_id: async (req, res) => {
+      const finalResult = {
+        success: false,
+        message: "",
+      };
+      try {
+        const account = await Account.findOne({
+          _id: req.params.id,
+          $or: [{ deleted: false }, { deleted: { $exists: false } }],
+        }).populate({
+          path: "sessions",
+          select: "session_id last_active",
+        });
+        if (!account) {
+          const error = new Error("Akun WhatsApp tidak ditemukan");
+          error.status = 404;
+          throw error;
+        }
+        if (
+          account.status === "connected" &&
+          account.sessions &&
+          account.sessions.session_id
+        ) {
+          await endSession(account.sessions.session_id);
+          const { error, message } = await deleteCreds(
+            account.sessions.session_id
+          );
+          if (error) {
+            const error = new Error(message);
+            error.status = 400;
+            throw error;
+          }
+        }
+        await Session.findOneAndDelete({
+          account: account._id,
+        });
+        account.status = "deleted";
+        account.deleted = true;
+        account.deleted_at = moment().tz("Asia/Jakarta");
+        await account.save();
+        finalResult.success = true;
+        finalResult.message = "Nomor WhatsApp berhasil dihapus";
+        res.status(200).json(finalResult);
+      } catch (e) {
+        console.log(e);
+        const status = e.status || 500;
+        finalResult.message = e.message || "Internal server error";
+        res.status(status).json(finalResult);
       }
-      console.log(account);
-      if (account.status === "connected") {
-        await endSession(account.sessions.session_id);
-        // const { error, message } = await endSession(account.session.session_id);
-        // if (error) {
-        //   const error = new Error(message);
-        //   error.status = 404;
-        //   throw error;
-        // }
+    },
+    multiple_ids: async (req, res) => {
+      const finalResult = {
+        ids: [],
+        success: false,
+        message: "",
+      };
+      try {
+        const accounts = await Account.find({
+          _id: { $in: req.body.ids },
+          $or: [{ deleted: false }, { deleted: { $exists: false } }],
+        }).populate({
+          path: "sessions",
+          select: "session_id last_active",
+        });
+        if (accounts.length === 0) {
+          const error = new Error("Akun WhatsApp tidak ditemukan");
+          error.status = 404;
+          throw error;
+        }
+        for (let account of accounts) {
+          if (account.status === "connected" && account.sessions.session_id) {
+            await endSession(account.sessions.session_id);
+            const { error, message } = await deleteCreds(
+              account.sessions.session_id
+            );
+            if (error) {
+              const error = new Error(message);
+              error.status = 400;
+              throw error;
+            }
+          }
+          await Session.findOneAndDelete({
+            account: account._id,
+          });
+          account.status = "deleted";
+          account.deleted = true;
+          account.deleted_at = moment().tz("Asia/Jakarta");
+          await account.save();
+        }
+        const deleted_ids = accounts.map((item) => item._id);
+        finalResult.ids = deleted_ids;
+        finalResult.success = true;
+        finalResult.message = `${deleted_ids.length} nomor WhatsApp berhasil dihapus`;
+        res.status(200).json(finalResult);
+      } catch (e) {
+        const status = e.status || 500;
+        finalResult.message = e.message || "Internal server error";
+        res.status(status).json(finalResult);
       }
-      const { error, message } = await deleteCreds(account.sessions.session_id);
-      if (error) {
-        const error = new Error(message);
-        error.status = 400;
-        throw error;
-      }
-      await Session.findByIdAndDelete(account.sessions._id);
-      account.status = "deleted";
-      account.deleted = true;
-      account.deleted_at = moment().tz("Asia/Jakarta");
-      await account.save();
-      finalResult.success = true;
-      finalResult.message = "Nomor WhatsApp berhasil dihapus";
-      res.status(200).json(finalResult);
-    } catch (e) {
-      const status = e.status || 500;
-      finalResult.message = e.message || "Internal server error";
-      res.status(status).json(finalResult);
-    }
+    },
   },
 };

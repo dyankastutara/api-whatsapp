@@ -51,18 +51,29 @@ module.exports = {
       }
       const id = await createSessionId();
       const sessionId = await checkSessionId(id);
-      const { qrImage, error, message } = await startSession(sessionId);
+      const { qrImage, error, message } = await startSession(
+        sessionId,
+        req.decoded.id
+      );
       if (error) {
         const error = new Error(message);
         error.status = 500;
         throw error;
       }
-      await TmpSession.create({
-        session_id: sessionId,
-        type: req.body.type,
-        status: "create",
-        user: req.decoded.id,
-      });
+      await TmpSession.findOneAndUpdate(
+        {
+          session_id: sessionId,
+        },
+        {
+          session_id: sessionId,
+          type: req.body.type,
+          status: "create",
+          user: req.decoded.id,
+        },
+        {
+          upsert: true,
+        }
+      );
       finalResult.sessionId = sessionId;
       finalResult.qrImage = qrImage;
       finalResult.success = true;
@@ -171,12 +182,20 @@ module.exports = {
         error.status = 500;
         throw error;
       }
-      await TmpSession.create({
-        session_id: sessionId,
-        type: session.account.type,
-        status: "connect",
-        user: req.decoded.id,
-      });
+      await TmpSession.findOneAndUpdate(
+        {
+          session_id: sessionId,
+        },
+        {
+          session_id: sessionId,
+          type: req.body.type,
+          status: "connect",
+          user: req.decoded.id,
+        },
+        {
+          upsert: true,
+        }
+      );
       finalResult.sessionId = sessionId;
       finalResult.qrImage = qrImage;
       finalResult.success = true;
@@ -190,7 +209,6 @@ module.exports = {
   },
   disconnect: async (req, res) => {
     let finalResult = {
-      id: "",
       sessionId: "",
       success: false,
       message: "",
@@ -201,7 +219,6 @@ module.exports = {
         session_id: sessionId,
       }).populate({
         path: "account",
-        select: "jid",
       });
       if (!session || !session.account) {
         const error = new Error("Akun WhatsApp tidak ditemukan");
@@ -214,7 +231,6 @@ module.exports = {
         error.status = 404;
         throw error;
       }
-      finalResult.id = req.body.id;
       finalResult.sessionId = sessionId;
       finalResult.success = true;
       finalResult.message = message;
