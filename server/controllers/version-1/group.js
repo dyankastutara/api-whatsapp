@@ -124,6 +124,9 @@ module.exports = {
             $or: [{ deleted: false }, { deleted: { $exists: false } }],
             ...query,
           })
+            .sort({
+              updated_at: -1,
+            })
             .skip(skip)
             .limit(perPage);
         } else {
@@ -131,6 +134,8 @@ module.exports = {
             user: req.decoded.id,
             $or: [{ deleted: false }, { deleted: { $exists: false } }],
             ...query,
+          }).sort({
+            updated_at: -1,
           });
         }
         const totalDocuments = await Group.countDocuments({
@@ -201,7 +206,35 @@ module.exports = {
         res.status(status).json(finalResult);
       }
     },
-    sync_with_ids: async (req, res) => {
+    with_contacts: async (req, res) => {
+      let finalResult = {
+        data: {},
+        success: false,
+        message: "",
+      };
+      try {
+        const { data, subject } = req.body;
+        const participants = data.map((item) => ({
+          ...item,
+          subscribed: true,
+          id: item.phone_number + "@s.whatsapp.net",
+        }));
+        const CreateGroup = await Group.create({
+          subject,
+          participants,
+          user: req.decoded.id,
+        });
+        finalResult.data = CreateGroup;
+        finalResult.success = true;
+        finalResult.message = `Group ${CreateGroup.subject} berhasil ditambahkan`;
+        res.status(200).json(finalResult);
+      } catch (e) {
+        const status = e.status || 500;
+        finalResult.message = e.message || "Internal server error";
+        res.status(status).json(finalResult);
+      }
+    },
+    sync_with_group_ids: async (req, res) => {
       let finalResult = {
         data: [],
         success: false,
@@ -243,8 +276,8 @@ module.exports = {
           error.status = 404;
           throw error;
         }
-        await Group.insertMany(data);
-        finalResult.data = data;
+        const results = await Group.insertMany(data);
+        finalResult.data = results;
         finalResult.success = true;
         finalResult.message = "Berhasil tambah data dari grup whatsapp";
         res.status(200).json(finalResult);
@@ -254,7 +287,6 @@ module.exports = {
         res.status(status).json(finalResult);
       }
     },
-    import: async (req, res) => {},
     contacts: async (req, res) => {
       let finalResult = {
         data: [],

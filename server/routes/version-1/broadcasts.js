@@ -6,6 +6,7 @@ const { uploadFile } = require("../../helpers/upload");
 /* GET Session Whatsapp center page. */
 router.get("/", authorization.access, controller.get.all);
 router.get("/:id", authorization.access, controller.get.by_id);
+router.get("/:id/messages", authorization.access, controller.get.messages);
 
 router.post("/", authorization.access, uploadFile.any(), controller.create);
 router.delete("/:id", authorization.access, controller.delete);

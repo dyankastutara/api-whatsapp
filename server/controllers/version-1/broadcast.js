@@ -58,6 +58,13 @@ module.exports = {
         const data = await Broadcast.find({
           user: req.decoded.id,
         })
+          .populate({
+            path: "messages",
+          })
+          .populate({
+            path: "groups",
+            select: "_id subject ",
+          })
           .skip(skip)
           .limit(parseInt(limit))
           .sort({ created_at: -1 });
@@ -82,13 +89,18 @@ module.exports = {
         const data = await Broadcast.findOne({
           user: req.decoded.id,
           _id: req.params.id,
-        }).populate({
-          path: "senders.account", // Populate account dari senders
-          populate: {
-            path: "sessions",
-            select: "session_id last_active",
-          },
-        });
+        })
+          .populate({
+            path: "senders.account", // Populate account dari senders
+            populate: {
+              path: "sessions",
+              select: "session_id last_active",
+            },
+          })
+          .populate({
+            path: "groups",
+            select: "_id subject ",
+          });
         if (!data) {
           const error = new Error("Dokumen tidak ditemukan");
           error.status = 404;
@@ -97,6 +109,49 @@ module.exports = {
         finalResult.data = data;
         finalResult.success = true;
         finalResult.message = "Dokumen berhasil ditemukan";
+        res.status(200).json(finalResult);
+      } catch (e) {
+        const status = e.status || 500;
+        finalResult.message = e.message || "Internal server error";
+        res.status(status).json(finalResult);
+      }
+    },
+    messages: async (req, res) => {
+      let finalResult = {
+        data: {},
+        count: 0,
+        success: false,
+        message: "",
+      };
+      try {
+        const { page, limit } = req.query;
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const totalDocument = await Message.countDocuments({
+          broadcast: req.params.id,
+        });
+        const data = await Message.find({
+          broadcast: req.params.id,
+        })
+          .populate({
+            path: "sender",
+            select: "phone_number name",
+          })
+          .populate({
+            path: "broadcast",
+            select: "name",
+          })
+          .skip(skip)
+          .limit(parseInt(limit))
+          .sort({ sent_at: -1 });
+        if (data.length === 0) {
+          const error = new Error("Dokumen pesan tidak ditemukan");
+          error.status = 404;
+          throw error;
+        }
+        finalResult.data = data;
+        finalResult.count = totalDocument;
+        finalResult.success = true;
+        finalResult.message = "Dokumen pesan berhasil ditemukan";
         res.status(200).json(finalResult);
       } catch (e) {
         const status = e.status || 500;

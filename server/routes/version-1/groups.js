@@ -15,9 +15,14 @@ router.post(
 
 router.post("/new", authorization.access, controller.add.new);
 router.post(
+  "/add_with_contacts",
+  authorization.access,
+  controller.add.with_contacts
+);
+router.post(
   "/sync_with_ids",
   authorization.access,
-  controller.add.sync_with_ids
+  controller.add.sync_with_group_ids
 );
 router.post("/:id/contacts", authorization.access, controller.add.contacts);
 

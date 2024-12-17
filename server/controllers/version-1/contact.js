@@ -58,6 +58,7 @@ module.exports = {
             } else if (connection === "open") {
               const phone_number = req.body.phone_no + "@s.whatsapp.net";
               const result = await socket.onWhatsApp(phone_number);
+              console.log(result);
               if (result.length > 0) {
                 finalResult.success = true;
                 finalResult.data = result ? result[0] : {};

@@ -202,7 +202,7 @@ async function startSession(sessionId, user_id) {
         if (qr) {
           try {
             console.log("session start qr");
-            qrterminal.generate(qr, { small: true });
+            // qrterminal.generate(qr, { small: true });
             const qrImage = await qrcode.toDataURL(qr);
             finalResult.qrImage = qrImage;
             finalResult.success = true;

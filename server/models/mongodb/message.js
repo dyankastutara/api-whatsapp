@@ -17,6 +17,10 @@ const messageSchema = new Schema(
         },
       },
     ],
+    status: {
+      type: String,
+      enum: ["sent", "pending", "cancel", ""],
+    },
     sent: { type: Boolean },
     sent_at: { type: Date },
     receiver: {

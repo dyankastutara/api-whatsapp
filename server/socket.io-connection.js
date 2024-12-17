@@ -40,13 +40,6 @@ const notifiWaAccountDisconnect = (userId, account) => {
   if (socketId) {
     io.to(socketId).emit("wa_account_disconnected", account);
     console.log(`wa_account_disconnected: ${userId}`);
-    for (const [userId, sId] of Object.entries(userSockets)) {
-      if (sId === socketId) {
-        delete userSockets[userId];
-        console.log(`User ${userId} disconnected`);
-        break;
-      }
-    }
   }
 };
 const notifyWaAccountQR = (userId, account) => {
