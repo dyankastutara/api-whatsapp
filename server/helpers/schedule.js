@@ -19,7 +19,7 @@ async function sendMessage(message, sender) {
     }
     await socket.waitForConnectionUpdate(
       ({ connection }) => connection === "open",
-      30000
+      90000
     );
     const jid = message.receiver + "@s.whatsapp.net";
     const isValid = await socket.onWhatsApp(jid);
@@ -75,9 +75,9 @@ async function sendMessage(message, sender) {
         {
           mid: msgId,
           sender: sender.account._id,
-          status: "sent",
-          sent: true,
-          sent_at: moment().tz("Asia/Jakarta"),
+          status: msgId ? "sent" : "failed",
+          sent: msgId ? true : false,
+          sent_at: msgId ? moment().tz("Asia/Jakarta") : null,
         }
       );
     } else {
@@ -87,7 +87,7 @@ async function sendMessage(message, sender) {
         },
         {
           sender: sender.account._id,
-          status: "cancel",
+          status: "invalid",
         }
       );
     }
