@@ -9,6 +9,7 @@ router.get("/:id", authorization.access, controller.get.by_id);
 router.get("/:id/messages", authorization.access, controller.get.messages);
 
 router.post("/", authorization.access, uploadFile.any(), controller.create);
+router.patch("/status/:id", authorization.access, controller.update.status);
 router.delete("/:id", authorization.access, controller.delete);
 
 module.exports = router;

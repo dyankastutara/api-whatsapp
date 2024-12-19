@@ -294,6 +294,36 @@ module.exports = {
       res.status(status).json(finalResult);
     }
   },
+  update: {
+    status: async (req, res) => {
+      let finalResult = {
+        data: {},
+        success: false,
+        message: "",
+      };
+      try {
+        const document = await Group.findOne({
+          _id: req.params.id,
+          user: req.decoded.id,
+        });
+        if (!document) {
+          const error = new Error("Dokumen tidak ditemukan");
+          error.status = 404;
+          throw error;
+        }
+        document.status = req.body.status;
+        await document.save();
+        finalResult.data = document;
+        finalResult.success = true;
+        finalResult.message = "Dokumen berhasil ditemukan";
+        res.status(200).json(finalResult);
+      } catch (e) {
+        const status = e.status || 500;
+        finalResult.message = e.message || "Internal server error";
+        res.status(status).json(finalResult);
+      }
+    },
+  },
   delete: async (req, res) => {
     let finalResult = {
       data: {},
