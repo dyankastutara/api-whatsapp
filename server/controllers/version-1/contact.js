@@ -107,6 +107,7 @@ module.exports = {
               const groups = await socket.groupFetchAllParticipating();
               const user = await socket.user;
               const data = Object.values(groups)
+                .filter((item) => !item.announce)
                 .map((item) => ({
                   ...item,
                   participants: item.participants

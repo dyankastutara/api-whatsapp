@@ -195,13 +195,21 @@ async function startSession(sessionId, user_id) {
   };
   try {
     const socket = await initializeSocket(sessionId);
+    const QR_TIMEOUT = 300000; // 5 menit
+    let qrTimeout;
+    const stopSocket = async () => {
+      finalResult.qrImage = "";
+      await notifyWaAccountQR(user_id, finalResult);
+      await socket.ev.removeAllListeners();
+      await socket.end();
+    };
+
     return new Promise(async (resolve, reject) => {
       // Event saat QR code tersedia
       await socket.ev.on("connection.update", async (update) => {
         const { qr, lastDisconnect, connection } = update;
         if (qr) {
           try {
-            console.log("session start qr");
             // qrterminal.generate(qr, { small: true });
             const qrImage = await qrcode.toDataURL(qr);
             finalResult.qrImage = qrImage;
@@ -209,10 +217,20 @@ async function startSession(sessionId, user_id) {
             finalResult.message = "QR Code berhasil dibuat untuk session";
             await notifyWaAccountQR(user_id, finalResult);
             resolve(finalResult);
+            if (!qrTimeout) {
+              // Set timer untuk timeout
+              qrTimeout = setTimeout(stopSocket, QR_TIMEOUT);
+            }
           } catch (err) {
             reject(err);
           }
-        } else if (lastDisconnect) {
+        }
+        if (connection === "open") {
+          if (qrTimeout) {
+            clearTimeout(qrTimeout); // Batalkan timeout jika berhasil terhubung
+          }
+        }
+        if (lastDisconnect) {
           const reasonStatus = lastDisconnect.error?.output?.statusCode;
           const shouldReconnect = reasonStatus !== DisconnectReason.loggedOut;
           if (shouldReconnect) {
@@ -222,7 +240,6 @@ async function startSession(sessionId, user_id) {
       });
     });
   } catch (err) {
-    console.log("Error Start Session");
     finalResult.error = true;
     finalResult.message = "QR Code gagal dibuat untuk session";
     resolve(finalResult);
@@ -274,7 +291,6 @@ async function endSession(sessionId) {
         }
       });
       await socket.ev.on("error", (e) => {
-        console.log(e);
         const error = new Error(e.message);
         reject(error);
       });
@@ -295,7 +311,6 @@ async function deleteCreds(sessionId) {
     const folder_path = await path.join(sessionsFolder, sessionId);
     if (fs.existsSync(folder_path)) {
       await fs.rmSync(folder_path, { recursive: true, force: true });
-      console.log("Session deleted and credentials removed.");
       finalResult.success = true;
       finalResult.message = "Session deleted and credentials removed.";
       return finalResult;

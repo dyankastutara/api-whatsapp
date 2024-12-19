@@ -176,7 +176,10 @@ module.exports = {
       if (fs.existsSync(sessionPath)) {
         await fs.rmSync(sessionPath, { recursive: true, force: true });
       }
-      const { qrImage, error, message } = await startSession(sessionId);
+      const { qrImage, error, message } = await startSession(
+        sessionId,
+        req.decoded.id
+      );
       if (error) {
         const error = new Error(message);
         error.status = 500;

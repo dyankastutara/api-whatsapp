@@ -3,7 +3,11 @@ const { removeSuffixID } = require("../../helpers/regex");
 const moment = require("moment-timezone");
 //DB
 const Group = require("../../models/mongodb/group");
+const Contact = require("../../models/mongodb/contact");
 
+const insertContacts = async (data) => {
+  return await Contact.insertMany(data);
+};
 module.exports = {
   grabber: {
     groups: async (req, res) => {
@@ -25,26 +29,30 @@ module.exports = {
         );
         const groups = await socket.groupFetchAllParticipating();
         const user = await socket.user;
-        finalResult.data = Object.values(groups).map((item) => ({
-          id: item.id,
-          subject: item.subject,
-          size: item.size - 1,
-          owner: item.owner,
-          participants: item.participants
-            .map((value) => ({
-              ...value,
-              name: "",
-              subscribed: true,
-              phone_number: value.id.split("@")[0],
-            }))
-            .filter(
-              (participant) => participant.id !== removeSuffixID(user?.id)
-            ),
-        }));
+        finalResult.data = Object.values(groups)
+          .filter((item) => !item.announce)
+          .map((item) => ({
+            ...item,
+            id: item.id,
+            subject: item.subject,
+            size: item.size - 1,
+            owner: item.owner,
+            participants: item.participants
+              .map((value) => ({
+                ...value,
+                name: "",
+                subscribed: true,
+                phone_number: value.id.split("@")[0],
+              }))
+              .filter(
+                (participant) => participant.id !== removeSuffixID(user?.id)
+              ),
+          }));
         finalResult.success = true;
         finalResult.message = "Berhasil ambil grup whatsapp";
         res.status(200).json(finalResult);
       } catch (e) {
+        console.log(e);
         const status = e.status || 500;
         finalResult.message = e.message || "Internal server error";
         res.status(status).json(finalResult);
@@ -224,6 +232,14 @@ module.exports = {
           participants,
           user: req.decoded.id,
         });
+        await Contact.insertMany(
+          participants.map((item) => ({
+            jid: item.id,
+            name: item.name,
+            phone_number: item.phone_number,
+            group: CreateGroup._id,
+          }))
+        );
         finalResult.data = CreateGroup;
         finalResult.success = true;
         finalResult.message = `Group ${CreateGroup.subject} berhasil ditambahkan`;
@@ -277,6 +293,16 @@ module.exports = {
           throw error;
         }
         const results = await Group.insertMany(data);
+        await Contact.insertMany(
+          results.flatMap((group) =>
+            group.participants.map((item) => ({
+              jid: item.id,
+              name: item.name,
+              phone_number: item.phone_number,
+              group: group._id,
+            }))
+          )
+        );
         finalResult.data = results;
         finalResult.success = true;
         finalResult.message = "Berhasil tambah data dari grup whatsapp";
@@ -308,8 +334,16 @@ module.exports = {
         const different_data = new_data.filter(
           (item) => !same_data.some((val) => item.id === val.id)
         );
+        await Contact.insertMany(
+          different_data.map((item) => ({
+            jid: item.id,
+            name: item.name,
+            phone_number: item.phone_number,
+            group: req.params.id,
+          }))
+        );
         const participants = Find.participants.concat(different_data);
-        const Update = await Group.findOneAndUpdate(
+        await Group.findOneAndUpdate(
           {
             _id: req.params.id,
           },
@@ -431,6 +465,15 @@ module.exports = {
         group.deleted = true;
         group.deleted_at = moment().tz("Asia/Jakarta");
         await group.save();
+        await Contact.findOneAndUpdate(
+          {
+            group: group._id,
+          },
+          {
+            deleted: true,
+            deleted_at: moment().tz("Asia/Jakarta"),
+          }
+        );
         finalResult.id = group.id;
         finalResult.success = true;
         finalResult.message = "Berhasil hapus group";
@@ -461,6 +504,15 @@ module.exports = {
           group.deleted = true;
           group.deleted_at = moment().tz("Asia/Jakarta");
           await group.save();
+          await Contact.findOneAndUpdate(
+            {
+              group: group._id,
+            },
+            {
+              deleted: true,
+              deleted_at: moment().tz("Asia/Jakarta"),
+            }
+          );
         }
         const deleted_ids = groups.map((item) => item._id);
         finalResult.ids = deleted_ids;
@@ -500,6 +552,15 @@ module.exports = {
           error.status = 404;
           throw error;
         }
+        await Contact.findOneAndUpdate(
+          {
+            _id: req.params.contact_id,
+          },
+          {
+            deleted: true,
+            deleted_at: moment().tz("Asia/Jakarta"),
+          }
+        );
         const tmp_participants = group.participants.filter(
           (item) => item.id !== req.params.contact_id
         );
@@ -537,6 +598,15 @@ module.exports = {
           const error = new Error(`Hapus kontak gagal. Kontak tidak ditemukan`);
           error.status = 404;
           throw error;
+        }
+        const contacts = await Contact.find({
+          _id: { $in: req.body.participant_ids },
+          $or: [{ deleted: false }, { deleted: { $exists: false } }],
+        });
+        for (let contact of contacts) {
+          contact.deleted = true;
+          contact.deleted_at = moment().tz("Asia/Jakarta");
+          await contact.save();
         }
         const tmp_participants = group.participants.filter(
           (item) => !req.body.participant_ids.includes(item.id)
