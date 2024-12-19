@@ -554,7 +554,7 @@ module.exports = {
         }
         await Contact.findOneAndUpdate(
           {
-            _id: req.params.contact_id,
+            jid: req.params.contact_id,
           },
           {
             deleted: true,
@@ -571,6 +571,7 @@ module.exports = {
         finalResult.message = "Berhasil hapus kontak";
         res.status(200).json(finalResult);
       } catch (e) {
+        console.log(e);
         const status = e.status || 500;
         finalResult.message = e.message || "Internal server error";
         res.status(status).json(finalResult);
