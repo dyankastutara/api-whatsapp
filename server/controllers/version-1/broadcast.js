@@ -75,7 +75,7 @@ module.exports = {
           })
           .skip(skip)
           .limit(parseInt(limit))
-          .sort({ created_at: -1 });
+          .sort({ updated_at: -1 });
         finalResult.count = totalDocument;
         finalResult.data = data.map((item) => ({
           ...item._doc,
@@ -266,6 +266,7 @@ module.exports = {
                 };
               })
             : [];
+          result.embed = content.embed;
           result.message = content.message;
           result.interactive = content.interactive ? content.interactive : [];
           return result;
@@ -317,6 +318,7 @@ module.exports = {
             filename: item.filename,
             sent: false,
             sent_at: null,
+            embed: item.embed,
             broadcast: create_broadcast._id,
           },
         ];
@@ -418,6 +420,7 @@ module.exports = {
                   };
                 })
               : [];
+            result.embed = content.embed;
             result.message = content.message;
             result.interactive = content.interactive ? content.interactive : [];
             return result;

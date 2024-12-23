@@ -21,6 +21,7 @@ const messageSchema = new Schema(
       type: String,
       enum: ["sent", "pending", "failed", "invalid", ""],
     },
+    embed: { type: Boolean, default: false },
     sent: { type: Boolean },
     sent_at: { type: Date },
     deleted: { type: Boolean },

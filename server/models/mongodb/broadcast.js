@@ -41,6 +41,7 @@ const broadcastSchema = new Schema(
             },
           },
         ],
+        embed: { type: Boolean, default: false },
       },
     ],
     deleted: { type: Boolean, default: false },

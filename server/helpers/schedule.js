@@ -9,6 +9,7 @@ const moment = require("moment-timezone");
 
 const mutex = new Mutex();
 
+const DEBUG = process.env.DEBUG === "true";
 async function sendMessage(message, sender) {
   try {
     const sessionId = sender.account.sessions?.session_id;
@@ -25,22 +26,46 @@ async function sendMessage(message, sender) {
     const isValid = await socket.onWhatsApp(jid);
     if (isValid[0]?.exists) {
       let msgId = "";
-      if (process.env.DEBUG !== "true") {
+      if (DEBUG) {
         if (message.mimetype) {
           const file_type = message.mimetype.split("/")[0];
           if (file_type === "image") {
-            const sendMsg = await socket.sendMessage(
-              jid,
-              {
-                image: { url: message.url },
-                fileName: message.filename,
-                mimetype: message.mimetype,
-                caption: message.message,
-              },
-              {
-                broadcast: true,
-              }
-            );
+            let sendMsg;
+            if (message.embed) {
+              sendMsg = await socket.sendMessage(
+                jid,
+                {
+                  image: { url: message.url },
+                  fileName: message.filename,
+                  mimetype: message.mimetype,
+                  caption: message.message,
+                },
+                {
+                  broadcast: true,
+                }
+              );
+            } else {
+              await socket.sendMessage(
+                jid,
+                {
+                  image: { url: message.url },
+                  fileName: message.filename,
+                  mimetype: message.mimetype,
+                },
+                {
+                  broadcast: true,
+                }
+              );
+              sendMsg = await socket.sendMessage(
+                jid,
+                {
+                  text: message.message,
+                },
+                {
+                  broadcast: true,
+                }
+              );
+            }
             msgId = sendMsg?.key?.id;
           } else {
             const sendMsg = await socket.sendMessage(
