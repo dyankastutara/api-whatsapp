@@ -182,9 +182,11 @@ module.exports = {
         const skip = (parseInt(page) - 1) * parseInt(limit);
         const totalDocument = await Message.countDocuments({
           broadcast: req.params.id,
+          $or: [{ deleted: false }, { deleted: { $exists: false } }],
         });
         const data = await Message.find({
           broadcast: req.params.id,
+          $or: [{ deleted: false }, { deleted: { $exists: false } }],
         })
           .populate({
             path: "sender",
@@ -361,6 +363,7 @@ module.exports = {
         const document = await Group.findOne({
           _id: req.params.id,
           user: req.decoded.id,
+          $or: [{ deleted: false }, { deleted: { $exists: false } }],
         });
         if (!document) {
           const error = new Error("Dokumen tidak ditemukan");

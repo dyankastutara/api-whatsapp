@@ -25,49 +25,51 @@ async function sendMessage(message, sender) {
     const isValid = await socket.onWhatsApp(jid);
     if (isValid[0]?.exists) {
       let msgId = "";
-      // if (message.mimetype) {
-      //   const file_type = message.mimetype.split("/")[0];
-      //   if (file_type === "image") {
-      //     const sendMsg = await socket.sendMessage(
-      //       jid,
-      //       {
-      //         image: { url: message.url },
-      //         fileName: message.filename,
-      //         mimetype: message.mimetype,
-      //         caption: message.message,
-      //       },
-      //       {
-      //         broadcast: true,
-      //       }
-      //     );
-      //     msgId = sendMsg?.key?.id;
-      //   } else {
-      //     const sendMsg = await socket.sendMessage(
-      //       jid,
-      //       {
-      //         document: { url: message.url },
-      //         fileName: message.fileName,
-      //         mimetype: message.mimetype,
-      //         caption: message.message,
-      //       },
-      //       {
-      //         broadcast: true,
-      //       }
-      //     );
-      //     msgId = sendMsg?.key?.id;
-      //   }
-      // } else {
-      //   const sendMsg = await socket.sendMessage(
-      //     jid,
-      //     {
-      //       text: message.message,
-      //     },
-      //     {
-      //       broadcast: true,
-      //     }
-      //   );
-      //   msgId = sendMsg?.key?.id;
-      // }
+      if (process.env.DEBUG !== "true") {
+        if (message.mimetype) {
+          const file_type = message.mimetype.split("/")[0];
+          if (file_type === "image") {
+            const sendMsg = await socket.sendMessage(
+              jid,
+              {
+                image: { url: message.url },
+                fileName: message.filename,
+                mimetype: message.mimetype,
+                caption: message.message,
+              },
+              {
+                broadcast: true,
+              }
+            );
+            msgId = sendMsg?.key?.id;
+          } else {
+            const sendMsg = await socket.sendMessage(
+              jid,
+              {
+                document: { url: message.url },
+                fileName: message.fileName,
+                mimetype: message.mimetype,
+                caption: message.message,
+              },
+              {
+                broadcast: true,
+              }
+            );
+            msgId = sendMsg?.key?.id;
+          }
+        } else {
+          const sendMsg = await socket.sendMessage(
+            jid,
+            {
+              text: message.message,
+            },
+            {
+              broadcast: true,
+            }
+          );
+          msgId = sendMsg?.key?.id;
+        }
+      }
       await Message.findOneAndUpdate(
         {
           _id: message._id,
@@ -92,7 +94,9 @@ async function sendMessage(message, sender) {
       );
     }
   } catch (e) {
-    return e;
+    return {
+      error: true,
+    };
   }
 }
 const funcMessage = async (broadcast, val) => {
@@ -109,7 +113,10 @@ const funcMessage = async (broadcast, val) => {
         sent: true,
       }).sort({ sent_at: -1 });
       if (!lastMessage) {
-        await sendMessage(messages[i], senders[senderIndex]);
+        const send = await sendMessage(messages[i], senders[senderIndex]);
+        if (send.error) {
+          await new Promise((resolve) => setTimeout(resolve, 2500));
+        }
         // await funcMessage(broadcast);
         console.log("kepanggil func send message inner !lastMessage");
         break;
@@ -123,7 +130,10 @@ const funcMessage = async (broadcast, val) => {
               Math.random() * (broadcast.delay.to - broadcast.delay.wait + 1)
             ) + broadcast.delay.wait;
           if (diff > delay) {
-            await sendMessage(messages[i], senders[senderIndex]);
+            const send = await sendMessage(messages[i], senders[senderIndex]);
+            if (send.error) {
+              await new Promise((resolve) => setTimeout(resolve, 2500));
+            }
           } else {
             await new Promise((resolve) =>
               setTimeout(async () => {
@@ -134,7 +144,10 @@ const funcMessage = async (broadcast, val) => {
             break;
           }
         } else {
-          await sendMessage(messages[i], senders[senderIndex]);
+          const send = await sendMessage(messages[i], senders[senderIndex]);
+          if (send.error) {
+            await new Promise((resolve) => setTimeout(resolve, 2500));
+          }
         }
       }
       if (broadcast.rest_mode.stop_sending_after) {
@@ -177,7 +190,7 @@ module.exports = {
         const broadcasts = await funcBroadcast();
         for (let broadcast of broadcasts) {
           const check_messages = broadcast.messages.filter(
-            (message) => !message.sent
+            (message) => !message.sent && !message.deleted
           );
           if (check_messages.length > 0) {
             await funcMessage(broadcast);
