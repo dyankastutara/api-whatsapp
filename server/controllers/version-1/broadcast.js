@@ -40,6 +40,12 @@ function timeToSend(obj) {
   }
   return time_send;
 }
+function findFileByComplexFieldname(files, fieldname) {
+  if (!Array.isArray(files)) {
+    return null;
+  }
+  return files.find((file) => file.fieldname === fieldname);
+}
 module.exports = {
   get: {
     all: async (req, res) => {
@@ -244,9 +250,8 @@ module.exports = {
             mimetype: "",
             filename: "",
           };
-          const file = req.files.find(
-            (f) => f.fieldname === `contents[${index}][attachment]`
-          );
+          const targetFieldname = `contents[${index}][attachment]`;
+          const file = findFileByComplexFieldname(req.files, targetFieldname);
           if (file) {
             const name = file.key.split("/");
             result.url = file.location;
@@ -353,6 +358,157 @@ module.exports = {
     }
   },
   update: {
+    by_id: async (req, res) => {
+      let finalResult = {
+        id: null,
+        success: false,
+        message: "",
+      };
+      try {
+        const {
+          name,
+          senders,
+          groups,
+          status,
+          time_to_send,
+          delay,
+          rest_mode,
+          perfect_timing,
+          sending_speed,
+        } = req.body;
+        const broadcast = await Broadcast.findOne({
+          _id: req.params.id,
+          user: req.decoded.id,
+          $or: [{ deleted: false }, { deleted: { $exists: false } }],
+        });
+        if (!broadcast) {
+          const error = new Error("Dokumen tidak ditemukan");
+          error.status = 404;
+          throw error;
+        }
+        await Message.deleteMany({
+          broadcast: broadcast._id,
+        });
+        const contents = await new Promise((resolve, reject) => {
+          const res = req.body.contents.map((content, index) => {
+            let result = {
+              message: "",
+              spintax: [],
+              interactive: [],
+              url: "",
+              mimetype: "",
+              filename: "",
+            };
+            const targetFieldname = `contents[${index}][attachment]`;
+            const file = findFileByComplexFieldname(req.files, targetFieldname);
+            if (file) {
+              const name = file.key.split("/");
+              result.url = file.location;
+              result.mimetype = file.mimetype;
+              result.filename = name[name.length - 1];
+            } else {
+              result.url = content.url;
+              result.mimetype = content.mimetype;
+              result.filename = content.filename;
+            }
+            result.spintax = content.spintax
+              ? content.spintax.map((spintax) => {
+                  return {
+                    message: spintax.message,
+                  };
+                })
+              : [];
+            result.message = content.message;
+            result.interactive = content.interactive ? content.interactive : [];
+            return result;
+          });
+          resolve(res);
+        });
+        const jsonBody = {
+          bid: broadcast.bid,
+          name,
+          senders: JSON.parse(senders || "[]"),
+          groups: JSON.parse(groups || "[]"),
+          contents,
+          time_to_send: await timeToSend(time_to_send),
+          sending_speed,
+          delay:
+            sending_speed === "auto"
+              ? {
+                  wait: 10,
+                  to: 90,
+                }
+              : JSON.parse(delay || "{}"),
+          rest_mode:
+            sending_speed === "auto"
+              ? {
+                  stop_sending_after: 20,
+                  and_rest_for: 90,
+                }
+              : JSON.parse(rest_mode || "{}"),
+          perfect_timing: perfect_timing === "true",
+          status,
+          user: req.decoded.id,
+        };
+        const group_documents = await Group.find({
+          _id: { $in: jsonBody.groups },
+        });
+        await Broadcast.findOneAndUpdate(
+          {
+            _id: req.params.id,
+          },
+          jsonBody
+        );
+        const participants = group_documents.flatMap((item) =>
+          item.participants.filter((participant) => !participant.deleted)
+        );
+        const messages = contents.flatMap((item) => {
+          // Membuat array baru dengan message utama
+          const messages = [
+            {
+              message: item.message,
+              url: item.url,
+              mimetype: item.mimetype,
+              filename: item.filename,
+              sent: false,
+              sent_at: null,
+              broadcast: broadcast._id,
+            },
+          ];
+
+          // Menambahkan spintax message jika ada
+          const spintaxMessages = item.spintax.map((spin) => ({
+            message: spin.message,
+            url: item.url,
+            mimetype: item.mimetype,
+            filename: item.filename,
+            sent: false,
+            sent_at: null,
+            broadcast: broadcast._id,
+          }));
+
+          // Menggabungkan keduanya
+          return messages.concat(spintaxMessages);
+        });
+        const save_messages = participants
+          .filter((item) => item.subscribed)
+          .map((contact, index) => {
+            return {
+              receiver: contact.phone_number,
+              ...messages[index % messages.length],
+            };
+          });
+        await Message.insertMany(save_messages);
+        finalResult.id = req.params.id;
+        finalResult.success = true;
+        finalResult.message = "Berhasil ubah broadcast";
+        res.status(200).json(finalResult);
+      } catch (e) {
+        const status = e.status || 500;
+        finalResult.message = e.message || "Internal server error";
+        res.status(status).json(finalResult);
+      }
+    },
     status: async (req, res) => {
       let finalResult = {
         data: {},
@@ -372,8 +528,7 @@ module.exports = {
         }
         document.status = req.body.status;
         await document.save();
-        finalResult.data = document;
-        finalResult.success = true;
+        (finalResult.data = document), (finalResult.success = true);
         finalResult.message = "Dokumen berhasil ditemukan";
         res.status(200).json(finalResult);
       } catch (e) {
@@ -383,46 +538,86 @@ module.exports = {
       }
     },
   },
-  delete: async (req, res) => {
-    let finalResult = {
-      data: {},
-      messages: [],
-      success: false,
-      message: "",
-    };
-    try {
-      const broadcast = await Broadcast.findOne({
-        _id: req.params.id,
-        user: req.decoded.id,
-        $or: [{ deleted: false }, { deleted: { $exists: false } }],
-      });
-      if (!broadcast) {
-        const error = new Error(
-          "Dokumen gagal dihapus. Dokumen tidak ditemukan"
-        );
-        error.status = 404;
-        throw error;
+  delete: {
+    by_id: async (req, res) => {
+      let finalResult = {
+        id: null,
+        success: false,
+        message: "",
+      };
+      try {
+        const broadcast = await Broadcast.findOne({
+          _id: req.params.id,
+          user: req.decoded.id,
+          $or: [{ deleted: false }, { deleted: { $exists: false } }],
+        });
+        if (!broadcast) {
+          const error = new Error(
+            "Dokumen gagal dihapus. Dokumen tidak ditemukan"
+          );
+          error.status = 404;
+          throw error;
+        }
+        const messages = await Message.find({
+          broadcast: broadcast._id,
+        });
+        for (let message of messages) {
+          message.deleted = true;
+          message.deleted_at = moment().tz("Asia/Jakarta");
+          await message.save();
+        }
+        broadcast.deleted = true;
+        broadcast.deleted_at = moment().tz("Asia/Jakarta");
+        await broadcast.save();
+        finalResult.id = broadcast._id;
+        finalResult.success = true;
+        finalResult.message = "Berhasil hapus broadcast";
+        res.status(200).json(finalResult);
+      } catch (e) {
+        const status = e.status || 500;
+        finalResult.message = e.message || "Internal server error";
+        res.status(status).json(finalResult);
       }
-      const messages = await Message.find({
-        broadcast: broadcast._id,
-      });
-      for (let message of messages) {
-        message.deleted = true;
-        message.deleted_at = moment().tz("Asia/Jakarta");
-        await message.save();
+    },
+    multiple_ids: async (req, res) => {
+      const finalResult = {
+        ids: [],
+        success: false,
+        message: "",
+      };
+      try {
+        const broadcasts = await Broadcast.find({
+          _id: { $in: req.body.ids },
+          $or: [{ deleted: false }, { deleted: { $exists: false } }],
+        });
+        if (broadcasts.length === 0) {
+          const error = new Error("Broadcast tidak ditemukan");
+          error.status = 404;
+          throw error;
+        }
+        for (let broadcast of broadcasts) {
+          broadcast.deleted = true;
+          broadcast.deleted_at = moment().tz("Asia/Jakarta");
+          await broadcast.save();
+        }
+        const messages = await Message.find({
+          broadcast: { $in: req.body.ids },
+        });
+        for (let message of messages) {
+          message.deleted = true;
+          message.deleted_at = moment().tz("Asia/Jakarta");
+          await message.save();
+        }
+        const deleted_ids = broadcasts.map((item) => item._id);
+        finalResult.ids = deleted_ids;
+        finalResult.success = true;
+        finalResult.message = `${deleted_ids.length} broadcast berhasil dihapus`;
+        res.status(200).json(finalResult);
+      } catch (e) {
+        const status = e.status || 500;
+        finalResult.message = e.message || "Internal server error";
+        res.status(status).json(finalResult);
       }
-      broadcast.deleted = true;
-      broadcast.deleted_at = moment().tz("Asia/Jakarta");
-      await broadcast.save();
-      finalResult.messages = messages;
-      finalResult.data = broadcast;
-      finalResult.success = true;
-      finalResult.message = "Berhasil hapus broadcast";
-      res.status(200).json(finalResult);
-    } catch (e) {
-      const status = e.status || 500;
-      finalResult.message = e.message || "Internal server error";
-      res.status(status).json(finalResult);
-    }
+    },
   },
 };

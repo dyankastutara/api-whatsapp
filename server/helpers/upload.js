@@ -17,7 +17,6 @@ const s3 = new S3Client({
     secretAccessKey: process.env.ACCESS_SECRET_KEY_S3,
   },
 });
-
 const deleteSingle = async (bucket, key) => {
   let result = {
     success: false,
@@ -99,12 +98,12 @@ const convertToWebp = async (location, key, bucket) => {
   }
 };
 
-const getExtension = (mimetype) => {
-  return mimetype.split("/")[1];
+const getExtension = (original_name) => {
+  return original_name.split(".")[1];
 };
 
 const uploadFile = multer({
-  limits: { fieldSize: 25 * 1024 * 1024 },
+  // limits: { fieldSize: 25 * 1024 * 1024 },
   storage: multerS3({
     s3: s3,
     bucket: process.env.BUCKET,
@@ -116,7 +115,9 @@ const uploadFile = multer({
     key: (req, file, done) => {
       done(
         null,
-        `${process.env.FOLDER}/att_${Date.now()}.${getExtension(file.mimetype)}`
+        `${process.env.FOLDER}/att_${Date.now()}.${getExtension(
+          file.originalname
+        )}`
       );
     },
   }),

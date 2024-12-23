@@ -503,15 +503,14 @@ module.exports = {
           group.deleted = true;
           group.deleted_at = moment().tz("Asia/Jakarta");
           await group.save();
-          await Contact.findOneAndUpdate(
-            {
-              group: group._id,
-            },
-            {
-              deleted: true,
-              deleted_at: moment().tz("Asia/Jakarta"),
-            }
-          );
+        }
+        const contacts = await Contact.find({
+          group: { $in: req.body.ids },
+        });
+        for (let contact of contacts) {
+          contact.deleted = true;
+          contact.deleted_at = moment().tz("Asia/Jakarta");
+          await contact.save();
         }
         const deleted_ids = groups.map((item) => item._id);
         finalResult.ids = deleted_ids;
