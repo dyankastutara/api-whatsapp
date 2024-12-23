@@ -400,7 +400,6 @@ module.exports = {
         message: "",
       };
       try {
-        console.log(req.body);
         const group = await Group.findOne({
           _id: req.params.id,
         });

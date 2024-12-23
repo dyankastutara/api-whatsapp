@@ -35,7 +35,7 @@ function timeToSend(obj) {
   if (time_send.type === "custom") {
     time_send = {
       type: "custom",
-      time: moment(obj.time).tz("Asia/Jakarta"),
+      time: moment(obj.time, "DD-MM-YYYY HH:mm").tz("Asia/Jakarta"),
     };
   }
   return time_send;
@@ -57,9 +57,11 @@ module.exports = {
         });
         const data = await Broadcast.find({
           user: req.decoded.id,
+          $or: [{ deleted: false }, { deleted: { $exists: false } }],
         })
           .populate({
             path: "messages",
+            select: "status sent",
           })
           .populate({
             path: "groups",
@@ -69,7 +71,30 @@ module.exports = {
           .limit(parseInt(limit))
           .sort({ created_at: -1 });
         finalResult.count = totalDocument;
-        finalResult.data = data;
+        finalResult.data = data.map((item) => ({
+          ...item._doc,
+          message: {
+            delivered: item.messages.filter(
+              (value) => value.sent && value.status === "sent"
+            ).length,
+            recipient: item.messages.length,
+            invalid_number: item.messages.filter(
+              (value) => value.status === "invalid"
+            ).length,
+            failed: item.messages.filter((value) => value.status === "failed")
+              .length,
+            delivery_rate: `${
+              Math.round(
+                (item.messages.filter(
+                  (value) => value.sent && value.status === "sent"
+                ).length /
+                  item.messages.length) *
+                  100 *
+                  100
+              ) / 100
+            }%`,
+          },
+        }));
         finalResult.success = true;
         finalResult.message = "Dokumen berhasil ditemukan";
         res.status(200).json(finalResult);
@@ -89,9 +114,15 @@ module.exports = {
         const data = await Broadcast.findOne({
           user: req.decoded.id,
           _id: req.params.id,
+          $or: [{ deleted: false }, { deleted: { $exists: false } }],
         })
           .populate({
+            path: "messages",
+            select: "status sent",
+          })
+          .populate({
             path: "senders.account", // Populate account dari senders
+            select: "name jid phone_number status",
             populate: {
               path: "sessions",
               select: "session_id last_active",
@@ -106,7 +137,30 @@ module.exports = {
           error.status = 404;
           throw error;
         }
-        finalResult.data = data;
+        finalResult.data = {
+          ...data._doc,
+          message: {
+            delivered: data.messages.filter(
+              (value) => value.sent && value.status === "sent"
+            ).length,
+            recipient: data.messages.length,
+            invalid_number: data.messages.filter(
+              (value) => value.status === "invalid"
+            ).length,
+            failed: data.messages.filter((value) => value.status === "failed")
+              .length,
+            delivery_rate: `${
+              Math.round(
+                (data.messages.filter(
+                  (value) => value.sent && value.status === "sent"
+                ).length /
+                  data.messages.length) *
+                  100 *
+                  100
+              ) / 100
+            }%`,
+          },
+        };
         finalResult.success = true;
         finalResult.message = "Dokumen berhasil ditemukan";
         res.status(200).json(finalResult);
@@ -199,8 +253,7 @@ module.exports = {
           }
 
           result.spintax = content.spintax
-            ? content.spintax.map((spintax, spintaxIndex) => {
-                const message = spintax.message;
+            ? content.spintax.map((spintax) => {
                 return {
                   message: spintax.message,
                 };
@@ -219,6 +272,7 @@ module.exports = {
         groups: JSON.parse(groups || "[]"),
         contents,
         time_to_send: await timeToSend(time_to_send),
+        sending_speed,
         delay:
           sending_speed === "auto"
             ? {
@@ -274,12 +328,14 @@ module.exports = {
         // Menggabungkan keduanya
         return messages.concat(spintaxMessages);
       });
-      const save_messages = participants.map((contact, index) => {
-        return {
-          receiver: contact.phone_number,
-          ...messages[index % messages.length],
-        };
-      });
+      const save_messages = participants
+        .filter((item) => item.subscribed)
+        .map((contact, index) => {
+          return {
+            receiver: contact.phone_number,
+            ...messages[index % messages.length],
+          };
+        });
       const create_messages = await Message.insertMany(save_messages);
       finalResult.data = {
         broadcast: create_broadcast,
@@ -327,12 +383,15 @@ module.exports = {
   delete: async (req, res) => {
     let finalResult = {
       data: {},
+      messages: [],
       success: false,
       message: "",
     };
     try {
       const broadcast = await Broadcast.findOne({
         _id: req.params.id,
+        user: req.decoded.id,
+        $or: [{ deleted: false }, { deleted: { $exists: false } }],
       });
       if (!broadcast) {
         const error = new Error(
@@ -341,9 +400,18 @@ module.exports = {
         error.status = 404;
         throw error;
       }
+      const messages = await Message.find({
+        broadcast: broadcast._id,
+      });
+      for (let message of messages) {
+        message.deleted = true;
+        message.deleted_at = moment().tz("Asia/Jakarta");
+        await message.save();
+      }
       broadcast.deleted = true;
       broadcast.deleted_at = moment().tz("Asia/Jakarta");
       await broadcast.save();
+      finalResult.messages = messages;
       finalResult.data = broadcast;
       finalResult.success = true;
       finalResult.message = "Berhasil hapus broadcast";

@@ -2,7 +2,7 @@ const { Server } = require("socket.io");
 
 const io = new Server(process.env.PORT_SOCKET_IO, {
   cors: {
-    origin: "http://localhost:5173", // Ganti dengan URL React Anda
+    origin: ["http://localhost:5173", "http://localhost:5174"], // Ganti dengan URL React Anda
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE"],
   },
 });

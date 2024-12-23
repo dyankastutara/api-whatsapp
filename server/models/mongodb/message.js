@@ -23,6 +23,8 @@ const messageSchema = new Schema(
     },
     sent: { type: Boolean },
     sent_at: { type: Date },
+    deleted: { type: Boolean },
+    deleted_at: { type: Date },
     receiver: {
       type: String,
     },

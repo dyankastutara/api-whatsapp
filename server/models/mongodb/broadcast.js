@@ -45,6 +45,7 @@ const broadcastSchema = new Schema(
     ],
     deleted: { type: Boolean, default: false },
     deleted_at: { type: Date },
+    sending_speed: { type: String, enum: ["custom", "auto"] },
     delay: {
       // seconds
       wait: { type: Number },
