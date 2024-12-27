@@ -9,7 +9,7 @@ const moment = require("moment-timezone");
 
 const mutex = new Mutex();
 
-const DEBUG = process.env.NODE_ENV === "development";
+const isProduction = process.env.NODE_ENV === "development";
 
 async function sendMessage(message, sender) {
   try {
@@ -27,7 +27,7 @@ async function sendMessage(message, sender) {
     const isValid = await socket.onWhatsApp(jid);
     if (isValid[0]?.exists) {
       let msgId = "";
-      if (!DEBUG) {
+      if (isProduction) {
         if (message.mimetype) {
           const file_type = message.mimetype.split("/")[0];
           if (file_type === "image") {
