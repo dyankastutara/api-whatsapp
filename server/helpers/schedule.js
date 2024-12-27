@@ -9,7 +9,7 @@ const moment = require("moment-timezone");
 
 const mutex = new Mutex();
 
-const isProduction = process.env.NODE_ENV === "development";
+const isProduction = process.env.NODE_ENV === "production";
 
 async function sendMessage(message, sender) {
   try {
@@ -19,106 +19,121 @@ async function sendMessage(message, sender) {
       const error = new Error(socket.message);
       throw error;
     }
-    await socket.waitForConnectionUpdate(
-      ({ connection }) => connection === "open",
-      90000
-    );
-    const jid = message.receiver + "@s.whatsapp.net";
-    const isValid = await socket.onWhatsApp(jid);
-    if (isValid[0]?.exists) {
-      let msgId = "";
-      if (isProduction) {
-        if (message.mimetype) {
-          const file_type = message.mimetype.split("/")[0];
-          if (file_type === "image") {
-            let sendMsg;
-            if (message.embed) {
-              sendMsg = await socket.sendMessage(
-                jid,
-                {
-                  image: { url: message.url },
-                  fileName: message.filename,
-                  mimetype: message.mimetype,
-                  caption: message.message,
-                },
-                {
-                  broadcast: true,
+    // await socket.waitForConnectionUpdate(
+    //   ({ connection }) => connection === "open",
+    //   90000
+    // );
+    await new Promise(async (resolve, reject) => {
+      await socket.ev.on("connection.update", async (update) => {
+        const { connection } = update;
+        if (connection === "open") {
+          const jid = message.receiver + "@s.whatsapp.net";
+          const isValid = await socket.onWhatsApp(jid);
+          if (isValid[0]?.exists) {
+            let msgId = "";
+            if (isProduction) {
+              if (message.mimetype) {
+                const file_type = message.mimetype.split("/")[0];
+                if (file_type === "image") {
+                  let sendMsg;
+                  if (message.embed) {
+                    sendMsg = await socket.sendMessage(
+                      jid,
+                      {
+                        image: { url: message.url },
+                        fileName: message.filename,
+                        mimetype: message.mimetype,
+                        caption: message.message,
+                      },
+                      {
+                        broadcast: true,
+                      }
+                    );
+                  } else {
+                    await socket.sendMessage(
+                      jid,
+                      {
+                        image: { url: message.url },
+                        fileName: message.filename,
+                        mimetype: message.mimetype,
+                      },
+                      {
+                        broadcast: true,
+                      }
+                    );
+                    sendMsg = await socket.sendMessage(
+                      jid,
+                      {
+                        text: message.message,
+                      },
+                      {
+                        broadcast: true,
+                      }
+                    );
+                  }
+                  msgId = sendMsg?.key?.id;
+                } else {
+                  const sendMsg = await socket.sendMessage(
+                    jid,
+                    {
+                      document: { url: message.url },
+                      fileName: message.fileName,
+                      mimetype: message.mimetype,
+                      caption: message.message,
+                    },
+                    {
+                      broadcast: true,
+                    }
+                  );
+                  msgId = sendMsg?.key?.id;
                 }
-              );
-            } else {
-              await socket.sendMessage(
-                jid,
-                {
-                  image: { url: message.url },
-                  fileName: message.filename,
-                  mimetype: message.mimetype,
-                },
-                {
-                  broadcast: true,
-                }
-              );
-              sendMsg = await socket.sendMessage(
-                jid,
-                {
-                  text: message.message,
-                },
-                {
-                  broadcast: true,
-                }
-              );
+              } else {
+                const sendMsg = await socket.sendMessage(
+                  jid,
+                  {
+                    text: message.message,
+                  },
+                  {
+                    broadcast: true,
+                  }
+                );
+                msgId = sendMsg?.key?.id;
+              }
             }
-            msgId = sendMsg?.key?.id;
-          } else {
-            const sendMsg = await socket.sendMessage(
-              jid,
+            await Message.findOneAndUpdate(
               {
-                document: { url: message.url },
-                fileName: message.fileName,
-                mimetype: message.mimetype,
-                caption: message.message,
+                _id: message._id,
               },
               {
-                broadcast: true,
+                mid: msgId,
+                sender: sender.account._id,
+                status: msgId ? "sent" : "failed",
+                sent: msgId ? true : false,
+                sent_at: msgId ? moment().tz("Asia/Jakarta") : null,
               }
             );
-            msgId = sendMsg?.key?.id;
+          } else {
+            await Message.findOneAndUpdate(
+              {
+                _id: message._id,
+              },
+              {
+                sender: sender.account._id,
+                status: "invalid",
+              }
+            );
           }
-        } else {
-          const sendMsg = await socket.sendMessage(
+          resolve({
             jid,
-            {
-              text: message.message,
-            },
-            {
-              broadcast: true,
-            }
-          );
-          msgId = sendMsg?.key?.id;
+          });
         }
-      }
-      await Message.findOneAndUpdate(
-        {
-          _id: message._id,
-        },
-        {
-          mid: msgId,
-          sender: sender.account._id,
-          status: msgId ? "sent" : "failed",
-          sent: msgId ? true : false,
-          sent_at: msgId ? moment().tz("Asia/Jakarta") : null,
-        }
-      );
-    } else {
-      await Message.findOneAndUpdate(
-        {
-          _id: message._id,
-        },
-        {
-          sender: sender.account._id,
-          status: "invalid",
-        }
-      );
-    }
+      });
+      await socket.ev.on("error", (e) => {
+        const error = new Error(e.message);
+        error.status = e.statusCode;
+        reject(error);
+      });
+    });
   } catch (e) {
     return {
       error: true,
@@ -211,12 +226,14 @@ const funcBroadcast = async () => {
 module.exports = {
   send_broadcast: (done) => {
     const actionFunction = async () => {
+      console.log("broadcast runn 1 minutes");
       const release = await mutex.acquire();
       try {
         const broadcasts = await funcBroadcast();
         for (let broadcast of broadcasts) {
           const check_messages = broadcast.messages.filter(
-            (message) => !message.sent && !message.deleted
+            (message) =>
+              !message.sent && !message.deleted && message.status === "pending"
           );
           if (check_messages.length > 0) {
             await funcMessage(broadcast);

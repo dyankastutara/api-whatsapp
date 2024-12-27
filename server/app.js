@@ -45,6 +45,6 @@ app.listen(app.get("port"), (error) => {
   console.log("Application Start in port " + app.get("port"));
   initExistingSessions();
   schedule.send_broadcast(() => {
-    console.log("Schedule broadcase running");
+    console.log("Schedule broadcast running");
   });
 });

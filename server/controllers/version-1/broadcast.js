@@ -320,6 +320,7 @@ module.exports = {
             sent_at: null,
             embed: item.embed,
             broadcast: create_broadcast._id,
+            status: "pending",
           },
         ];
 
@@ -331,7 +332,9 @@ module.exports = {
           filename: item.filename,
           sent: false,
           sent_at: null,
+          embed: item.embed,
           broadcast: create_broadcast._id,
+          status: "pending",
         }));
 
         // Menggabungkan keduanya
