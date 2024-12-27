@@ -5,9 +5,6 @@ const moment = require("moment-timezone");
 const Group = require("../../models/mongodb/group");
 const Contact = require("../../models/mongodb/contact");
 
-const insertContacts = async (data) => {
-  return await Contact.insertMany(data);
-};
 module.exports = {
   grabber: {
     groups: async (req, res) => {
@@ -52,7 +49,6 @@ module.exports = {
         finalResult.message = "Berhasil ambil grup whatsapp";
         res.status(200).json(finalResult);
       } catch (e) {
-        console.log(e);
         const status = e.status || 500;
         finalResult.message = e.message || "Internal server error";
         res.status(status).json(finalResult);
@@ -464,15 +460,16 @@ module.exports = {
         group.deleted = true;
         group.deleted_at = moment().tz("Asia/Jakarta");
         await group.save();
-        await Contact.findOneAndUpdate(
-          {
-            group: group._id,
-          },
-          {
-            deleted: true,
-            deleted_at: moment().tz("Asia/Jakarta"),
+        const contacts = await Contact.find({
+          group: group._id,
+        });
+        for (let contact of contacts) {
+          if (contact) {
+            contact.deleted = true;
+            contact.deleted_at = moment().tz("Asia/Jakarta");
+            await contact.save();
           }
-        );
+        }
         finalResult.id = group.id;
         finalResult.success = true;
         finalResult.message = "Berhasil hapus group";
@@ -508,9 +505,11 @@ module.exports = {
           group: { $in: req.body.ids },
         });
         for (let contact of contacts) {
-          contact.deleted = true;
-          contact.deleted_at = moment().tz("Asia/Jakarta");
-          await contact.save();
+          if (contact) {
+            contact.deleted = true;
+            contact.deleted_at = moment().tz("Asia/Jakarta");
+            await contact.save();
+          }
         }
         const deleted_ids = groups.map((item) => item._id);
         finalResult.ids = deleted_ids;
@@ -550,15 +549,18 @@ module.exports = {
           error.status = 404;
           throw error;
         }
-        await Contact.findOneAndUpdate(
-          {
-            jid: req.params.contact_id,
-          },
-          {
-            deleted: true,
-            deleted_at: moment().tz("Asia/Jakarta"),
-          }
-        );
+        const contact = await Contact.findOne({
+          jid: req.params.contact_id,
+          group: req.params.id,
+          deleted: false,
+        });
+        console.log(contact);
+        if (contact) {
+          contact.deleted = true;
+          contact.deleted_at = moment().tz("Asia/Jakarta");
+          await contact.save();
+        }
+
         const tmp_participants = group.participants.filter(
           (item) => item.id !== req.params.contact_id
         );
@@ -599,13 +601,16 @@ module.exports = {
           throw error;
         }
         const contacts = await Contact.find({
-          _id: { $in: req.body.participant_ids },
+          jid: { $in: req.body.participant_ids },
+          group: req.params.id,
           $or: [{ deleted: false }, { deleted: { $exists: false } }],
         });
         for (let contact of contacts) {
-          contact.deleted = true;
-          contact.deleted_at = moment().tz("Asia/Jakarta");
-          await contact.save();
+          if (contact) {
+            contact.deleted = true;
+            contact.deleted_at = moment().tz("Asia/Jakarta");
+            await contact.save();
+          }
         }
         const tmp_participants = group.participants.filter(
           (item) => !req.body.participant_ids.includes(item.id)

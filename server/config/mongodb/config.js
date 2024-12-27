@@ -5,7 +5,7 @@ require("dotenv").config();
 var db_config = {
   development: "mongodb://localhost:27017/plasgos_whatsapp",
   test: "mongodb://localhost:27017/plasgos_whatsapp_test",
-  production: process.env.MONGODB_WHATSAPP_SESSIONS_URI,
+  production: process.env.MONGODB_URI,
 };
 
 var app_env = app.settings.env;

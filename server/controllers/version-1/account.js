@@ -147,7 +147,6 @@ module.exports = {
         finalResult.message = "Nomor WhatsApp berhasil dihapus";
         res.status(200).json(finalResult);
       } catch (e) {
-        console.log(e);
         const status = e.status || 500;
         finalResult.message = e.message || "Internal server error";
         res.status(status).json(finalResult);
